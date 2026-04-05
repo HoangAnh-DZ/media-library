@@ -2,6 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Media Library – Dashboard</title>
 <style>
 * { box-sizing: border-box; }
@@ -35,7 +36,8 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
 .stat p { margin-top:8px; color:#6b7280; }
 .form-group { margin-top:14px; }
 .form-group label { font-size:14px; font-weight:600; color:#374151; }
-.form-group input { width:100%; padding:8px; margin-top:6px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; }
+.form-group input { width:100%; padding:8px; margin-top:6px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; outline:none; transition:border-color .2s; }
+.form-group input:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.1); }
 .btn-primary { margin-top:10px; padding:8px 14px; border:none; border-radius:6px; background:#2563eb; color:white; cursor:pointer; font-size:14px; transition: background 0.2s; }
 .btn-primary:hover { background:#1d4ed8; }
 
@@ -166,19 +168,6 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
 .recent-header span { color: #2563eb; font-size: 13px; font-weight: 600; cursor: pointer; transition: color 0.2s;}
 .recent-header span:hover { color: #1d4ed8; text-decoration: underline;}
 
-/* ===== COMMON SECTION ===== */
-.section { margin-bottom: 28px; }
-.section h3, .section-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 12px; }
-
-/* ===== ALBUM CARD GRID ===== */
-.album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
-.album-card { background: white; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,.08); cursor: pointer; transition: all .2s ease; overflow: hidden; }
-.album-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,.14); }
-.album-cover { height: 120px; background: linear-gradient(135deg, #2563eb, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 42px; color: white; }
-.album-body { padding: 14px 16px; }
-.album-title { font-size: 14px; font-weight: 700; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.album-desc { font-size: 12px; color: #6b7280; margin-top: 4px; height: 32px; overflow: hidden; }
-.album-meta { margin-top: 10px; font-size: 11px; color: #9ca3af; }
 </style>
 </head>
 
@@ -205,7 +194,6 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
   </div>
 </div>
 
-<!-- Modal xem trước Media -->
 <div class="modal-bg" id="mediaModal" onclick="closeModal(event)">
   <div class="modal-box">
     <div class="modal-info" style="border-bottom:1px solid #e5e7eb; padding:12px 16px;">
@@ -222,12 +210,11 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
   </div>
 </div>
 
-<!-- Modal Sửa Album -->
 <div class="modal-bg" id="editAlbumModal" onclick="if(event.target===this) this.classList.remove('open')">
   <div class="modal-box" style="max-width: 400px;">
     <div class="modal-info" style="border-bottom:1px solid #e5e7eb; padding:12px 16px;">
       <button class="modal-close" onclick="document.getElementById('editAlbumModal').classList.remove('open')">✕</button>
-      <span class="modal-title">✏️ Sửa thông tin Album</span>
+      <span class="modal-title" style="font-weight:700; font-size:16px;">✏️ Sửa thông tin Album</span>
     </div>
     <div style="padding: 20px;">
       <input type="hidden" id="editAlbumId">
@@ -257,7 +244,6 @@ let currentMediaList = [];
 let batchSelections = []; 
 
 /* ===== REDIRECT SAFE ===== */
-/* Ngăn chặn lỗi khi đang ở chế độ xem trước (Preview) bị kẹt chuyển hướng trang */
 function redirectToLogin() {
   try {
     window.location.href = "login.html";
@@ -585,12 +571,10 @@ function renderMediaItems(items) {
           <div class="media-tags">${(m.tags || '').split(',').filter(Boolean).map(t => `<span class="media-tag">#${t}</span>`).join('')}</div>
           <div class="media-meta">${m.media_type} · ${formatDate(m.uploaded_at)}</div>
           
-          <!-- Bổ sung hiển thị trạng thái hiện tại -->
           <div style="font-size:11px; margin-top:4px; color:${m.visibility === 2 ? '#10b981' : '#f59e0b'}; font-weight:600;">
             ${m.visibility === 2 ? '🌍 Đang Công khai' : '🔒 Đang Riêng tư'}
           </div>
 
-          <!-- Bổ sung nút bấm -->
           <div style="display:flex; gap:6px; margin-top:8px">
             <button type="button" onclick="toggleVisibility(${m.media_id}, ${m.visibility})" 
               style="flex:1; padding:4px; border:none; border-radius:6px; cursor:pointer; font-size:11px; background:#f3f4f6; color:#374151">
@@ -601,6 +585,13 @@ function renderMediaItems(items) {
               🗑 Xóa
             </button>
           </div>
+          
+          ${m.visibility===2 ? `
+            <div style="margin-top:4px">
+              <input readonly value="${MAPI}/view/${m.media_id}"
+                style="width:100%;font-size:10px;padding:3px 6px;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer"
+                onclick="this.select(); document.execCommand('copy'); alert('Đã copy link!')">
+            </div>` : ''}
         </div>
       </div>
     `;
@@ -614,24 +605,16 @@ async function deleteMedia(media_id) {
 }
 
 async function toggleVisibility(media_id, currentVis) {
-  // Nếu đang là 1 (Private) thì đổi thành 2 (Public) và ngược lại
   const newVis = currentVis === 1 ? 2 : 1; 
-  
   try {
     const res = await fetch(`${API}/vis/${media_id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ visibility: newVis })
     });
-    
-    if (res.ok) {
-      loadMediaGrid(); // Tải lại danh sách để cập nhật giao diện
-    } else {
-      alert("Đổi trạng thái thất bại!");
-    }
-  } catch(e) {
-    alert("Lỗi kết nối đến server");
-  }
+    if (res.ok) loadMediaGrid();
+    else alert("Đổi trạng thái thất bại!");
+  } catch(e) { alert("Lỗi kết nối đến server"); }
 }
 
 /* ── Modal ── */
@@ -680,7 +663,7 @@ async function renderAlbum() {
 
   let albums = [];
   try {
-    const r = await fetch(`${MAPI}/albums/${user.user_id}`);
+    const r = await fetch(`${API}/api/albums/${user.user_id}`);
     albums = await r.json();
   } catch(e) {}
 
@@ -694,7 +677,6 @@ async function renderAlbum() {
       </div>
     </div>
 
-    <!-- Thanh tìm kiếm nhanh Album -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin: 24px 0 14px;">
       <div class="section-title" style="margin:0;">📂 Album của bạn</div>
       <input type="text" id="searchAlbumInput" placeholder="🔍 Tìm kiếm album..."
@@ -706,7 +688,6 @@ async function renderAlbum() {
       ${albums.length === 0
         ? `<div class="media-empty">📭 Chưa có album nào</div>`
         : `<div class="media-grid" id="albumGrid">${albums.map(a => {
-            
             let coverHTML = `<div style="height:140px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:40px">🗂</div>`;
             if (a.cover_url) {
               if (a.cover_type === 'video') coverHTML = `<video style="width:100%;height:140px;object-fit:cover;display:block;" src="${API}${a.cover_url}#t=0.1" preload="metadata" muted></video>`;
@@ -741,7 +722,6 @@ async function renderAlbum() {
       }
     </div>
 
-    <!-- Modal album -->
     <div id="albumModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;padding:20px;align-items:center;justify-content:center;">
       <div style="background:white;width:100%;max-width:900px;max-height:90vh;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;">
         <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
@@ -796,7 +776,7 @@ async function submitEditAlbum() {
 
   if(!name) { alert("Tên album không được để trống!"); return; }
 
-  const res = await fetch(`${MAPI}/albums/${id}`, {
+  const res = await fetch(`${API}/api/albums/${id}`, {
     method: "PUT", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ album_name: name, description: desc })
   });
@@ -843,7 +823,7 @@ async function loadAlbumMedia() {
 
   let items = [];
   try {
-    const res = await fetch(`${MAPI}/album-media/${currentAlbumId}`);
+    const res = await fetch(`${API}/api/album-media/${currentAlbumId}`);
     items = await res.json();
   } catch(e) { box.innerHTML = `<div class="media-empty">❌ Không tải được</div>`; return; }
 
@@ -898,7 +878,7 @@ async function loadAddMedia() {
 
   const [r1, r2] = await Promise.all([
     fetch(`${MAPI}/media/${user.user_id}`),
-    fetch(`${MAPI}/album-media/${currentAlbumId}`)
+    fetch(`${API}/api/album-media/${currentAlbumId}`)
   ]);
   const allMedia    = await r1.json();
   const albumMedia  = await r2.json();
@@ -963,7 +943,7 @@ async function submitBatchAdd() {
      if (vid) dur = Math.round(vid.duration) || null;
 
      try {
-       await fetch(`${MAPI}/album-media`, {
+       await fetch(`${API}/api/album-media`, {
           method: "POST", headers: {"Content-Type":"application/json"},
           body: JSON.stringify({ album_id: currentAlbumId, media_id: id, duration_seconds: dur })
        });
@@ -977,7 +957,7 @@ async function submitBatchAdd() {
 
 async function removeFromAlbum(media_id) {
   if (!confirm("Xóa media này khỏi album?")) return;
-  const res = await fetch(`${MAPI}/album-media/${currentAlbumId}/${media_id}`, { method: "DELETE" });
+  const res = await fetch(`${API}/api/album-media/${currentAlbumId}/${media_id}`, { method: "DELETE" });
   if (res.ok) loadAlbumMedia(); else alert("Xóa thất bại");
 }
 
@@ -986,7 +966,7 @@ async function createAlbum() {
   const desc = document.getElementById("albumDesc").value.trim();
   const user = JSON.parse(localStorage.getItem("user"));
   if (!name) { alert("Nhập tên album"); return; }
-  const res = await fetch(`${MAPI}/albums`, {
+  const res = await fetch(`${API}/api/albums`, {
     method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ user_id: user.user_id, album_name: name, description: desc })
   });
@@ -995,12 +975,13 @@ async function createAlbum() {
 
 async function deleteAlbum(album_id) {
   if (!confirm("Xóa album này?")) return;
-  const res = await fetch(`${MAPI}/albums/${album_id}`, { method: "DELETE" });
+  const res = await fetch(`${API}/api/albums/${album_id}`, { method: "DELETE" });
   if (res.ok) renderAlbum(); else alert("Xóa thất bại");
 }
 
 /* ===== ACCOUNT ===== */
 async function renderAccount() {
+  pageTitle.innerText = "Tài khoản";
   const user = JSON.parse(localStorage.getItem("user"));
 
   let mediaCount = 0;
@@ -1008,24 +989,16 @@ async function renderAccount() {
   let tagCount   = 0;
 
   try {
-    /* ===== FETCH MEDIA ===== */
     const rMedia  = await fetch(`${MAPI}/media/${user.user_id}`);
     const media   = await rMedia.json();
     mediaCount    = media.length;
 
-    /* ===== FETCH ALBUM ===== */
-    const rAlbum  = await fetch(`${MAPI}/albums/${user.user_id}`);
+    const rAlbum  = await fetch(`${API}/api/albums/${user.user_id}`);
     const albums  = await rAlbum.json();
     albumCount    = albums.length;
 
-    /* ===== COUNT TAG ===== */
     const tagSet = new Set();
-    media.forEach(m =>
-      (m.tags || "")
-        .split(",")
-        .filter(Boolean)
-        .forEach(t => tagSet.add(t))
-    );
+    media.forEach(m => (m.tags || "").split(",").filter(Boolean).forEach(t => tagSet.add(t)));
     tagCount = tagSet.size;
 
   } catch (e) {
@@ -1109,6 +1082,11 @@ function logout() {
   localStorage.clear();
   redirectToLogin();
 }
+
+document.addEventListener("click", e => {
+  const box = document.getElementById("tagSuggestions");
+  if (box && !e.target.closest("#tagWrap")) box.style.display="none";
+});
 
 document.addEventListener("DOMContentLoaded", init);
 
