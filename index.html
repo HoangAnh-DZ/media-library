@@ -2,6 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Media Library – Dashboard</title>
 <style>
 * { box-sizing: border-box; }
@@ -35,7 +36,8 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
 .stat p { margin-top:8px; color:#6b7280; }
 .form-group { margin-top:14px; }
 .form-group label { font-size:14px; font-weight:600; color:#374151; }
-.form-group input { width:100%; padding:8px; margin-top:6px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; }
+.form-group input { width:100%; padding:8px; margin-top:6px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; outline:none; transition:border-color .2s; }
+.form-group input:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.1); }
 .btn-primary { margin-top:10px; padding:8px 14px; border:none; border-radius:6px; background:#2563eb; color:white; cursor:pointer; font-size:14px; transition: background 0.2s; }
 .btn-primary:hover { background:#1d4ed8; }
 
@@ -92,7 +94,6 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
   transition:.2s;
 }
 
-/* khi mở modal */
 .modal-bg.open{
   opacity:1;
   pointer-events:auto;
@@ -231,7 +232,7 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
   <div class="modal-box" style="max-width: 400px;">
     <div class="modal-info" style="border-bottom:1px solid #e5e7eb; padding:12px 16px;">
       <button class="modal-close" onclick="document.getElementById('editAlbumModal').classList.remove('open')">✕</button>
-      <span class="modal-title">✏️ Sửa thông tin Album</span>
+      <span class="modal-title" style="font-weight:700; font-size:16px;">✏️ Sửa thông tin Album</span>
     </div>
     <div style="padding: 20px;">
       <input type="hidden" id="editAlbumId">
@@ -257,8 +258,28 @@ const content   = document.getElementById("content");
 
 let selectedTags = [];
 let allTags      = [];
+
+// ── CACHE STATE ──
+// Biến lưu trữ dữ liệu để tránh gọi API liên tục
+let cachedMediaList = null; 
+let cachedAlbumsList = null;
 let currentMediaList = []; 
 let batchSelections = []; 
+
+/* ===== REDIRECT SAFE ===== */
+function redirectToLogin() {
+  try {
+    window.location.href = "login.html";
+  } catch (err) {
+    document.body.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#f3f4f6; text-align:center; padding:20px;">
+        <h2 style="color:#dc2626; margin-bottom:10px;">Bạn chưa đăng nhập!</h2>
+        <p style="color:#374151; margin-bottom:15px;">Môi trường xem trước không hỗ trợ tự động chuyển trang.</p>
+        <p style="color:#374151;">Vui lòng mở trực tiếp file <b>login.html</b> trên trình duyệt của bạn nhé!</p>
+      </div>
+    `;
+  }
+}
 
 /* ===== INIT ===== */
 function init() {
@@ -280,7 +301,37 @@ function init() {
   if(menuItems[idx]) menuItems[idx].classList.add("active");
 
   const map = { dashboard:renderDashboard, media:renderMedia, album:renderAlbum, account:renderAccount };
+  
+  // Nạp Tags một lần duy nhất lúc khởi tạo
+  fetchTagsOnce();
+  
   map[savedPage]?.();
+}
+
+async function fetchTagsOnce() {
+  if (allTags.length === 0) {
+    try {
+      const r = await fetch(`${API}/tags`);
+      allTags  = await r.json();
+    } catch(e) { allTags = []; }
+  }
+}
+
+/* ===== MỚI: FETCH MEDIA DATA ===== */
+// Hàm này chỉ gọi API nếu cache rỗng, hoặc bị ép làm mới (forceRefresh)
+async function fetchMediaData(forceRefresh = false) {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!cachedMediaList || forceRefresh) {
+    try {
+      const res = await fetch(`${MAPI}/media/${user.user_id}`);
+      cachedMediaList = await res.json();
+    } catch (e) {
+      console.error("Lỗi tải media:", e);
+      cachedMediaList = [];
+    }
+  }
+  currentMediaList = [...cachedMediaList]; // Copy ra để tìm kiếm lọc không ảnh hưởng cache gốc
+  return currentMediaList;
 }
 
 /* ===== NAVIGATE ===== */
@@ -302,12 +353,11 @@ async function renderDashboard() {
   content.innerHTML = `<div class="media-empty">⏳ Đang tải dữ liệu tổng quan...</div>`;
 
   try {
-    const [resMedia, resAlbums] = await Promise.all([
-      fetch(`${MAPI}/media/${user.user_id}`),
-      fetch(`${API}/api/albums/${user.user_id}`)
-    ]);
-
-    const media = resMedia.ok ? await resMedia.json() : [];
+    // Tận dụng Caching: Chỉ gọi fetch data 
+    const media = await fetchMediaData();
+    
+    // Tạm thời gọi API album trực tiếp ở đây, bạn có thể thiết lập caching cho album tương tự nếu muốn tối ưu sâu hơn
+    const resAlbums = await fetch(`${API}/api/albums/${user.user_id}`);
     const albums = resAlbums.ok ? await resAlbums.json() : [];
 
     const totalMedia = media.length;
@@ -403,11 +453,6 @@ async function renderMedia() {
   pageTitle.innerText = "Media";
   selectedTags = [];
 
-  try {
-    const r = await fetch(`${API}/tags`);
-    allTags  = await r.json();
-  } catch(e) { allTags = []; }
-
   content.innerHTML = `
     <div class="card">
       <h3 style="margin:0 0 16px">⬆️ Upload Media</h3>
@@ -446,7 +491,9 @@ async function renderMedia() {
     <div id="mediaGrid"><div class="media-empty">⏳ Đang tải...</div></div>
   `;
 
-  loadMediaGrid();
+  // Thay vì fetch thẳng, ta xài hàm Caching đã viết
+  const mediaItems = await fetchMediaData();
+  renderMediaItems(mediaItems);
 }
 
 function handleSearchMedia(query) {
@@ -515,75 +562,135 @@ function removeTag(id) { selectedTags = selectedTags.filter(t => t.tag_id !== id
 
 function renderChips() { document.getElementById("tagChips").innerHTML = selectedTags.map(t => `<span class="tag-chip">#${t.tag_name} <span class="rm" onclick="removeTag(${t.tag_id})">×</span></span>`).join(""); }
 
+/* ===== TỐI ƯU UPLOAD ===== */
 async function uploadMedia() {
-  const file  = document.getElementById("mediaFile").files[0];
-  const title = document.getElementById("mediaTitle").value.trim();
+  const fileInput = document.getElementById("mediaFile");
+  const file = fileInput.files[0];
+  const titleInput = document.getElementById("mediaTitle");
+  const title = titleInput.value.trim();
   const user  = JSON.parse(localStorage.getItem("user"));
 
   if (!file)  { alert("Vui lòng chọn file"); return; }
   if (!title) { alert("Vui lòng nhập tiêu đề"); return; }
 
   const formData = new FormData();
-  formData.append("file", file); formData.append("title", title); formData.append("user_id", user.user_id); formData.append("tags", JSON.stringify(selectedTags.map(t => t.tag_id)));
+  formData.append("file", file); 
+  formData.append("title", title); 
+  formData.append("user_id", user.user_id); 
+  formData.append("tags", JSON.stringify(selectedTags.map(t => t.tag_id)));
 
-  const wrap = document.getElementById("progressWrap"); const fill = document.getElementById("progressFill"); const txt  = document.getElementById("progressText");
-  wrap.style.display = "block"; fill.style.width = "30%"; fill.style.background = "#2563eb"; txt.innerText = "Đang upload..."; document.getElementById("uploadBtn").disabled = true;
+  const wrap = document.getElementById("progressWrap"); 
+  const fill = document.getElementById("progressFill"); 
+  const txt  = document.getElementById("progressText");
+  
+  wrap.style.display = "block"; 
+  fill.style.width = "30%"; 
+  fill.style.background = "#2563eb"; 
+  txt.innerText = "Đang upload..."; 
+  document.getElementById("uploadBtn").disabled = true;
 
   try {
     const res  = await fetch(`${MAPI}/media/upload`, { method:"POST", body: formData });
     const data = await res.json();
     if (res.ok) {
       fill.style.width = "100%"; txt.innerText = "✅ Upload thành công!";
-      document.getElementById("mediaFile").value  = ""; document.getElementById("mediaTitle").value = ""; selectedTags = []; renderChips();
+      
+      // Clear form
+      fileInput.value  = ""; 
+      titleInput.value = ""; 
+      selectedTags = []; 
+      renderChips();
+      
       setTimeout(() => { wrap.style.display="none"; fill.style.width="0"; }, 1500);
-      loadMediaGrid();
-    } else { txt.innerText = "❌ " + (data.error || "Upload thất bại"); fill.style.background = "#dc2626"; }
-  } catch(e) { txt.innerText = "❌ Không kết nối được server"; fill.style.background = "#dc2626"; }
+      
+      // ÉP LÀM MỚI CACHE & VẼ LẠI SAU KHI UPLOAD
+      const newItems = await fetchMediaData(true);
+      renderMediaItems(newItems);
+      
+    } else { 
+      txt.innerText = "❌ " + (data.error || "Upload thất bại"); 
+      fill.style.background = "#dc2626"; 
+    }
+  } catch(e) { 
+    txt.innerText = "❌ Không kết nối được server"; 
+    fill.style.background = "#dc2626"; 
+  }
   document.getElementById("uploadBtn").disabled = false;
 }
 
-async function loadMediaGrid() {
-  const user = JSON.parse(localStorage.getItem("user"));
-  const grid = document.getElementById("mediaGrid");
-  if (!grid) return;
-  try {
-    const res = await fetch(`${MAPI}/media/${user.user_id}`);
-    currentMediaList = await res.json(); 
-    renderMediaItems(currentMediaList); 
-  } catch (e) { grid.innerHTML = `<div class="media-empty">❌ Không tải được media</div>`; }
+/* ── DOM Render ── */
+function generateMediaItemHTML(m) {
+  let thumbHTML = "";
+  if (m.media_type === "image") {
+    thumbHTML = `<img class="media-thumb" src="${API}${m.file_url}" alt="${m.title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`;
+  } else if (m.media_type === "video") {
+    thumbHTML = `<video class="media-thumb" src="${API}${m.file_url}#t=0.1" preload="metadata" muted></video>`;
+  } else {
+    thumbHTML = `<div class="media-thumb-icon">📄</div>`;
+  }
+
+  const searchKeywords = (m.title + ' ' + (m.tags || '')).toLowerCase().replace(/"/g, '&quot;');
+  
+  return `
+    <div class="media-item" id="media-card-${m.media_id}" data-search="${searchKeywords}">
+      <div style="cursor:pointer" onclick="openModal(${JSON.stringify(m).replace(/"/g,'&quot;')})">${thumbHTML}</div>
+      <div class="media-info">
+        <div class="media-title">${m.title}</div>
+        <div class="media-tags">${(m.tags || '').split(',').filter(Boolean).map(t => `<span class="media-tag">#${t}</span>`).join('')}</div>
+        <div class="media-meta">${m.media_type} · ${formatDate(m.uploaded_at)}</div>
+        <button type="button" onclick="deleteMedia(${m.media_id})" style="margin-top:8px;width:100%;padding:4px;border:none;border-radius:6px;cursor:pointer;font-size:11px;background:#fee2e2;color:#991b1b">🗑 Xóa media</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderMediaItems(items) {
   const grid = document.getElementById("mediaGrid");
   if (!grid) return;
-  if (!items.length) { grid.innerHTML = `<div class="media-empty">📭 Không tìm thấy media nào!</div>`; return; }
+  if (!items || !items.length) { grid.innerHTML = `<div class="media-empty">📭 Không tìm thấy media nào!</div>`; return; }
 
-  grid.innerHTML = `<div class="media-grid">${items.map(m => {
-    let thumbHTML = "";
-    if (m.media_type === "image") thumbHTML = `<img class="media-thumb" src="${API}${m.file_url}" alt="${m.title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`;
-    else if (m.media_type === "video") thumbHTML = `<video class="media-thumb" src="${API}${m.file_url}#t=0.1" preload="metadata" muted></video>`;
-    else thumbHTML = `<div class="media-thumb-icon">📄</div>`;
-
-    const searchKeywords = (m.title + ' ' + (m.tags || '')).toLowerCase().replace(/"/g, '&quot;');
-    return `
-      <div class="media-item" data-search="${searchKeywords}">
-        <div style="cursor:pointer" onclick="openModal(${JSON.stringify(m).replace(/"/g,'&quot;')})">${thumbHTML}</div>
-        <div class="media-info">
-          <div class="media-title">${m.title}</div>
-          <div class="media-tags">${(m.tags || '').split(',').filter(Boolean).map(t => `<span class="media-tag">#${t}</span>`).join('')}</div>
-          <div class="media-meta">${m.media_type} · ${formatDate(m.uploaded_at)}</div>
-          <button type="button" onclick="deleteMedia(${m.media_id})" style="margin-top:8px;width:100%;padding:4px;border:none;border-radius:6px;cursor:pointer;font-size:11px;background:#fee2e2;color:#991b1b">🗑 Xóa media</button>
-        </div>
-      </div>
-    `;
-  }).join("")}</div>`;
+  grid.innerHTML = `<div class="media-grid">${items.map(m => generateMediaItemHTML(m)).join("")}</div>`;
 }
 
+/* ===== TỐI ƯU DELETE XÓA TRỰC TIẾP KHỎI DOM VÀ CACHE ===== */
 async function deleteMedia(media_id) {
   if (!confirm("Xóa media này?")) return;
-  const res = await fetch(`${MAPI}/media/${media_id}`, { method: "DELETE" });
-  if (res.ok) loadMediaGrid(); else alert("Xóa thất bại");
+  
+  // Hiệu ứng xóa mờ ảo trên giao diện trước
+  const card = document.getElementById(`media-card-${media_id}`);
+  if(card) {
+      card.style.opacity = '0.5';
+      card.style.pointerEvents = 'none';
+  }
+
+  try {
+    const res = await fetch(`${MAPI}/media/${media_id}`, { method: "DELETE" });
+    if (res.ok) {
+        // Cập nhật Cache: Xoá item ra khỏi mảng
+        if(cachedMediaList) {
+            cachedMediaList = cachedMediaList.filter(item => item.media_id !== media_id);
+            currentMediaList = [...cachedMediaList];
+        }
+        
+        // Xóa phần tử khỏi giao diện thay vì gọi hàm renderMediaItems tải lại tất cả
+        if(card) {
+           card.remove(); 
+           // Kiểm tra xem grid có bị rỗng không sau khi xóa
+           const remainingItems = document.querySelectorAll('#mediaGrid .media-item');
+           if(remainingItems.length === 0) {
+               document.getElementById("mediaGrid").innerHTML = `<div class="media-empty">📭 Không tìm thấy media nào!</div>`;
+           }
+        }
+    } else { 
+        alert("Xóa thất bại"); 
+        if(card) { card.style.opacity = '1'; card.style.pointerEvents = 'auto'; } // Khôi phục nếu lỗi
+    }
+  } catch(e) {
+      alert("Lỗi kết nối khi xóa");
+      if(card) { card.style.opacity = '1'; card.style.pointerEvents = 'auto'; } 
+  }
 }
+
 
 /* ── Modal ── */
 function openModal(m) {
@@ -592,7 +699,7 @@ function openModal(m) {
   const video = document.getElementById("modalVideo");
   const icon  = document.getElementById("modalIcon");
 
-  img.style.display   = "none"; video.style.display = "none"; video.pause(); video.src = ""; icon.style.display  = "none";
+  img.style.display   = "none"; video.style.display = "none"; video.pause(); video.removeAttribute('src'); icon.style.display  = "none";
 
   if (m.media_type === "image") { img.src = API + m.file_url; img.style.display = "block"; } 
   else if (m.media_type === "video") { video.src = API + m.file_url; video.style.display = "block"; video.load(); video.play().catch(()=>{}); } 
@@ -606,14 +713,14 @@ function openModal(m) {
 function closeModalBtn() {
   document.getElementById("mediaModal").classList.remove("open");
   const video = document.getElementById("modalVideo");
-  if (video) { video.pause(); video.src = ""; }
+  if (video) { video.pause(); video.removeAttribute('src'); }
 }
 
 function closeModal(e) {
   if (e.target === document.getElementById("mediaModal")) {
     document.getElementById("mediaModal").classList.remove("open");
     const video = document.getElementById("modalVideo");
-    if (video) { video.pause(); video.remove(); }
+    if (video) { video.pause(); video.removeAttribute('src'); }
   }
 }
 
@@ -631,7 +738,7 @@ async function renderAlbum() {
 
   let albums = [];
   try {
-    const r = await fetch(`${MAPI}/albums/${user.user_id}`);
+    const r = await fetch(`${API}/api/albums/${user.user_id}`);
     albums = await r.json();
   } catch(e) {}
 
@@ -645,7 +752,6 @@ async function renderAlbum() {
       </div>
     </div>
 
-    <!-- Thanh tìm kiếm nhanh Album -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin: 24px 0 14px;">
       <div class="section-title" style="margin:0;">📂 Album của bạn</div>
       <input type="text" id="searchAlbumInput" placeholder="🔍 Tìm kiếm album..."
@@ -657,7 +763,6 @@ async function renderAlbum() {
       ${albums.length === 0
         ? `<div class="media-empty">📭 Chưa có album nào</div>`
         : `<div class="media-grid" id="albumGrid">${albums.map(a => {
-            
             let coverHTML = `<div style="height:140px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:40px">🗂</div>`;
             if (a.cover_url) {
               if (a.cover_type === 'video') coverHTML = `<video style="width:100%;height:140px;object-fit:cover;display:block;" src="${API}${a.cover_url}#t=0.1" preload="metadata" muted></video>`;
@@ -747,7 +852,7 @@ async function submitEditAlbum() {
 
   if(!name) { alert("Tên album không được để trống!"); return; }
 
-  const res = await fetch(`${MAPI}/albums/${id}`, {
+  const res = await fetch(`${API}/api/albums/${id}`, {
     method: "PUT", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ album_name: name, description: desc })
   });
@@ -794,7 +899,7 @@ async function loadAlbumMedia() {
 
   let items = [];
   try {
-    const res = await fetch(`${MAPI}/album-media/${currentAlbumId}`);
+    const res = await fetch(`${API}/api/album-media/${currentAlbumId}`);
     items = await res.json();
   } catch(e) { box.innerHTML = `<div class="media-empty">❌ Không tải được</div>`; return; }
 
@@ -842,17 +947,20 @@ async function loadAlbumMedia() {
 
 async function loadAddMedia() {
   const box  = document.getElementById("tabContentAdd");
-  const user = JSON.parse(localStorage.getItem("user"));
+  
   box.innerHTML = "⏳ Đang tải...";
 
   batchSelections = []; 
 
-  const [r1, r2] = await Promise.all([
-    fetch(`${MAPI}/media/${user.user_id}`),
-    fetch(`${MAPI}/album-media/${currentAlbumId}`)
-  ]);
-  const allMedia    = await r1.json();
-  const albumMedia  = await r2.json();
+  // Lấy dữ liệu từ cache thay vì gọi lại API Media
+  const allMedia = await fetchMediaData();
+  
+  let albumMedia = [];
+  try {
+     const r2 = await fetch(`${API}/api/album-media/${currentAlbumId}`);
+     albumMedia = await r2.json();
+  } catch(e) { console.error("Lỗi lấy album media", e); }
+  
   const inAlbumIds  = new Set(albumMedia.map(m => m.media_id));
 
   if (!allMedia.length) { box.innerHTML = `<div class="media-empty">Bạn chưa có media nào</div>`; return; }
@@ -914,7 +1022,7 @@ async function submitBatchAdd() {
      if (vid) dur = Math.round(vid.duration) || null;
 
      try {
-       await fetch(`${MAPI}/album-media`, {
+       await fetch(`${API}/api/album-media`, {
           method: "POST", headers: {"Content-Type":"application/json"},
           body: JSON.stringify({ album_id: currentAlbumId, media_id: id, duration_seconds: dur })
        });
@@ -928,7 +1036,7 @@ async function submitBatchAdd() {
 
 async function removeFromAlbum(media_id) {
   if (!confirm("Xóa media này khỏi album?")) return;
-  const res = await fetch(`${MAPI}/album-media/${currentAlbumId}/${media_id}`, { method: "DELETE" });
+  const res = await fetch(`${API}/api/album-media/${currentAlbumId}/${media_id}`, { method: "DELETE" });
   if (res.ok) loadAlbumMedia(); else alert("Xóa thất bại");
 }
 
@@ -937,7 +1045,7 @@ async function createAlbum() {
   const desc = document.getElementById("albumDesc").value.trim();
   const user = JSON.parse(localStorage.getItem("user"));
   if (!name) { alert("Nhập tên album"); return; }
-  const res = await fetch(`${MAPI}/albums`, {
+  const res = await fetch(`${API}/api/albums`, {
     method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ user_id: user.user_id, album_name: name, description: desc })
   });
@@ -946,12 +1054,13 @@ async function createAlbum() {
 
 async function deleteAlbum(album_id) {
   if (!confirm("Xóa album này?")) return;
-  const res = await fetch(`${MAPI}/albums/${album_id}`, { method: "DELETE" });
+  const res = await fetch(`${API}/api/albums/${album_id}`, { method: "DELETE" });
   if (res.ok) renderAlbum(); else alert("Xóa thất bại");
 }
 
 /* ===== ACCOUNT ===== */
 async function renderAccount() {
+  pageTitle.innerText = "Tài khoản";
   const user = JSON.parse(localStorage.getItem("user"));
 
   let mediaCount = 0;
@@ -959,24 +1068,16 @@ async function renderAccount() {
   let tagCount   = 0;
 
   try {
-    /* ===== FETCH MEDIA ===== */
-    const rMedia  = await fetch(`${MAPI}/media/${user.user_id}`);
-    const media   = await rMedia.json();
+    // Tận dụng dữ liệu Cache đã tải
+    const media   = await fetchMediaData();
     mediaCount    = media.length;
 
-    /* ===== FETCH ALBUM ===== */
-    const rAlbum  = await fetch(`${MAPI}/albums/${user.user_id}`);
+    const rAlbum  = await fetch(`${API}/api/albums/${user.user_id}`);
     const albums  = await rAlbum.json();
     albumCount    = albums.length;
 
-    /* ===== COUNT TAG ===== */
     const tagSet = new Set();
-    media.forEach(m =>
-      (m.tags || "")
-        .split(",")
-        .filter(Boolean)
-        .forEach(t => tagSet.add(t))
-    );
+    media.forEach(m => (m.tags || "").split(",").filter(Boolean).forEach(t => tagSet.add(t)));
     tagCount = tagSet.size;
 
   } catch (e) {
@@ -1056,13 +1157,19 @@ async function changePassword() {
   res.ok ? alert("Đổi mật khẩu thành công ✅") : alert(data.error);
 }
 
-function logout() { localStorage.clear(); location.href="login.html"; }
+function logout() {
+  localStorage.clear();
+  redirectToLogin();
+}
+
+document.addEventListener("click", e => {
+  const box = document.getElementById("tagSuggestions");
+  if (box && !e.target.closest("#tagWrap")) box.style.display="none";
+});
 
 document.addEventListener("DOMContentLoaded", init);
 
-
 </script>
-
 
 </body>
 </html>
