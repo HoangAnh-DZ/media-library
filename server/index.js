@@ -258,8 +258,15 @@ app.get("/api/view/:media_id", async (req, res) => {
 app.get("/api/albums/:user_id", async (req, res) => {
   try {
     const pool = await poolPromise;
-    const r = await pool.request().input("uid", req.params.user_id)
-      .query("SELECT album_id,album_name,description,created_at FROM albums WHERE user_id=@uid ORDER BY created_at DESC");
+    const r = await pool.request().input("uid", req.params.user_id).query(`
+      SELECT a.album_id, a.album_name, a.description, a.created_at,
+             (SELECT COUNT(*) FROM album_media am WHERE am.album_id = a.album_id) AS item_count,
+             (SELECT m.file_url FROM album_media am JOIN media m ON am.media_id = m.media_id WHERE am.album_id = a.album_id ORDER BY am.sort_order ASC, m.uploaded_at DESC LIMIT 1) AS cover_url,
+             (SELECT m.media_type FROM album_media am JOIN media m ON am.media_id = m.media_id WHERE am.album_id = a.album_id ORDER BY am.sort_order ASC, m.uploaded_at DESC LIMIT 1) AS cover_type
+      FROM albums a
+      WHERE a.user_id = @uid 
+      ORDER BY a.created_at DESC
+    `);
     res.json(r.recordset);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -274,6 +281,20 @@ app.post("/api/albums", async (req, res) => {
       .input("desc", description || "")
       .query("INSERT INTO albums(user_id,album_name,description,created_at) VALUES(@uid,@name,@desc,NOW())");
     res.json({ message: "Tạo album thành công" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// API MỚI BỔ SUNG: SỬA TÊN VÀ MÔ TẢ ALBUM
+app.put("/api/albums/:album_id", async (req, res) => {
+  const { album_name, description } = req.body;
+  try {
+    const pool = await poolPromise;
+    await pool.request()
+      .input("aid", parseInt(req.params.album_id))
+      .input("name", album_name)
+      .input("desc", description || "")
+      .query("UPDATE albums SET album_name=@name, description=@desc WHERE album_id=@aid");
+    res.json({ message: "Đã cập nhật album" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
