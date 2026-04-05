@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Quên mật khẩu</title>
+  <link rel="stylesheet" href="./css/auth.css">
+</head>
+<body>
+
+<div class="auth-box">
+  <h2>Quên mật khẩu</h2>
+
+  <input id="username"    placeholder="Username">
+  <input id="email"       type="email"    placeholder="Email">
+  <input id="newPassword" type="password" placeholder="Mật khẩu mới">
+
+  <button onclick="forgotPassword()">Đổi mật khẩu</button>
+
+  <div class="auth-links">
+    <a href="./login.html">Quay lại đăng nhập</a>
+  </div>
+</div>
+
+<script>
+async function forgotPassword() {
+  const username    = document.getElementById("username").value.trim();
+  const email       = document.getElementById("email").value.trim();
+  const newPassword = document.getElementById("newPassword").value.trim();
+
+  if (!username || !email || !newPassword) {
+    alert("Vui lòng nhập đầy đủ username, email và mật khẩu mới");
+    return;
+  }
+
+  if (newPassword.length < 6) {
+    alert("Mật khẩu mới phải có ít nhất 6 ký tự");
+    return;
+  }
+
+  try {
+    const res  = await fetch("http://localhost:3000/auth/forgot", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ username, email, newPassword })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      alert("Đổi mật khẩu thành công! Vui lòng đăng nhập lại.");
+      window.location.href = "login.html";
+    } else {
+      alert(data.error || data.message || "Thất bại, kiểm tra lại thông tin");
+    }
+  } catch (err) {
+    alert("Không kết nối được server. Hãy chắc chắn server đang chạy.");
+  }
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Media Library – Dashboard</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; }
+
+.layout { display:flex; height:100vh; }
+
+.sidebar { width:240px; background:#1f2937; color:white; padding:20px; flex-shrink:0; }
+.sidebar h2 { text-align:center; margin-bottom:30px; }
+.menu-item { padding:14px; border-radius:8px; margin-bottom:10px; cursor:pointer; transition:all .25s; }
+.menu-item:hover { background:#374151; transform:scale(1.05); }
+.menu-item.active { background:#2563eb; transform:scale(1.08); }
+
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+.header { height:60px; background:white; display:flex; justify-content:space-between; align-items:center; padding:0 25px; border-bottom:1px solid #e5e7eb; flex-shrink:0; }
+.header .right { display:flex; align-items:center; gap:15px; }
+.logout { background:#dc2626; color:white; border:none; border-radius:6px; padding:8px 12px; cursor:pointer; }
+
+.content { padding:30px; overflow-y:auto; flex:1; }
+
+.card { background:white; padding:20px; border-radius:14px; margin-bottom:20px; box-shadow:0 8px 20px rgba(0,0,0,0.1); }
+
+.profile-header { display:flex; align-items:center; gap:20px; margin-bottom:30px; }
+.avatar { width:96px; height:96px; border-radius:50%; background:#e5e7eb; display:flex; justify-content:center; align-items:center; font-size:40px; font-weight:bold; color:#4b5563; }
+.profile-info h3 { margin:0; }
+.profile-info p { margin-top:6px; color:#6b7280; }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+.stat { background:white; padding:20px; border-radius:14px; box-shadow:0 8px 20px rgba(0,0,0,0.1); text-align:center; }
+.stat h2 { margin:0; font-size:28px; color:#2563eb; }
+.stat p { margin-top:8px; color:#6b7280; }
+.form-group { margin-top:14px; }
+.form-group label { font-size:14px; font-weight:600; color:#374151; }
+.form-group input { width:100%; padding:8px; margin-top:6px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; }
+.btn-primary { margin-top:10px; padding:8px 14px; border:none; border-radius:6px; background:#2563eb; color:white; cursor:pointer; font-size:14px; transition: background 0.2s; }
+.btn-primary:hover { background:#1d4ed8; }
+
+.upload-form { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:end; }
+.upload-form .full { grid-column: 1 / -1; }
+.upload-form input[type="file"] { width:100%; padding:10px; border:2px dashed #d1d5db; border-radius:8px; background:#f9fafb; cursor:pointer; font-size:13px; }
+.upload-form input[type="file"]:hover { border-color:#2563eb; background:#eff6ff; }
+.upload-form input[type="text"] { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.upload-form input[type="text"]:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+
+.tag-input-wrap { position:relative; }
+.tag-input-wrap input { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.tag-input-wrap input:focus { border-color:#2563eb; }
+.tag-suggestions { position:absolute; top:100%; left:0; right:0; z-index:10; background:white; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); max-height:160px; overflow-y:auto; display:none; }
+.tag-suggestion-item { padding:8px 12px; cursor:pointer; font-size:13px; }
+.tag-suggestion-item:hover { background:#eff6ff; color:#2563eb; }
+.tag-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.tag-chip { background:#dbeafe; color:#1d4ed8; border-radius:99px; padding:3px 10px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px; }
+.tag-chip .rm { cursor:pointer; font-size:14px; line-height:1; color:#6b7280; }
+.tag-chip .rm:hover { color:#dc2626; }
+
+.btn-upload { padding:10px 24px; background:#2563eb; color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:background .2s; height:40px; }
+.btn-upload:hover { background:#1d4ed8; }
+.btn-upload:disabled { background:#93c5fd; cursor:not-allowed; }
+
+.section-title { font-size:16px; font-weight:700; color:#1f2937; margin:24px 0 14px; }
+.media-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:16px; }
+.media-item { background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); transition:transform .2s, box-shadow .2s; }
+.media-item:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.14); }
+.media-thumb { width:100%; height:140px; object-fit:cover; display:block; background:#f3f4f6; }
+.media-thumb-icon { width:100%; height:140px; display:flex; align-items:center; justify-content:center; font-size:48px; background:#f9fafb; }
+.media-info { padding:10px 12px; }
+.media-title { font-size:13px; font-weight:600; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.media-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.media-tag { background:#dbeafe; color:#1d4ed8; border-radius:99px; padding:2px 8px; font-size:11px; }
+.media-meta { font-size:11px; color:#9ca3af; margin-top:4px; }
+.media-empty { text-align:center; color:#9ca3af; padding:40px 0; font-size:15px; }
+
+.progress-wrap { margin-top:10px; display:none; }
+.progress-bar { height:6px; background:#e5e7eb; border-radius:99px; overflow:hidden; }
+.progress-fill { height:100%; background:#2563eb; border-radius:99px; transition:width .3s; width:0%; }
+.progress-text { font-size:12px; color:#6b7280; margin-top:4px; }
+
+.modal-bg {
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.85);
+  display:flex;
+  align-items:center; justify-content:center;
+  z-index:9999;
+  opacity:0;
+  pointer-events:none;
+  transition:.2s;
+}
+
+/* khi mở modal */
+.modal-bg.open{
+  opacity:1;
+  pointer-events:auto;
+}
+.modal-box{
+  background:white;
+  border-radius:16px;
+  max-width:900px;
+  width:90%;
+  max-height:90vh;
+  overflow:auto;
+  box-shadow:0 25px 70px rgba(0,0,0,.5);
+  position:relative;
+  z-index:10000;
+}
+.modal-img { width:100%; max-height:400px; object-fit:contain; background:#000; }
+.modal-info { padding:16px 20px; }
+.modal-title { font-weight:700; font-size:16px; margin:0 0 6px; }
+.modal-tags { display:flex; flex-wrap:wrap; gap:6px; }
+.modal-tag { background:#dbeafe; color:#1d4ed8; border-radius:99px; padding:3px 10px; font-size:12px; }
+.modal-close { float:right; background:none; border:none; font-size:22px; cursor:pointer; color:#6b7280; }
+
+/* ===== DASHBOARD SPECIFIC STYLES ===== */
+.hero-banner {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border-radius: 16px;
+  padding: 36px 40px;
+  color: white;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+.hero-banner::after {
+  content: '';
+  position: absolute;
+  right: -50px;
+  top: -50px;
+  width: 250px;
+  height: 250px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+}
+.hero-banner::before {
+  content: '';
+  position: absolute;
+  right: 100px;
+  bottom: -50px;
+  width: 150px;
+  height: 150px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 50%;
+}
+.hero-banner h2 { margin: 0 0 12px 0; font-size: 30px; z-index: 1; position: relative; }
+.hero-banner p { margin: 0; font-size: 15px; opacity: 0.9; max-width: 500px; z-index: 1; position: relative; line-height: 1.5; }
+.hero-buttons { margin-top: 24px; display: flex; gap: 14px; z-index: 1; position: relative; }
+.btn-white { background: white; color: #2563eb; border: none; padding: 10px 22px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; font-size: 14px;}
+.btn-white:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
+.btn-outline { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 10px 22px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-size: 14px;}
+.btn-outline:hover { background: rgba(255,255,255,0.25); }
+
+.dash-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 28px; }
+.dash-stat-card { background: white; padding: 20px; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); display: flex; align-items: center; gap: 16px; transition: transform 0.2s; border: 1px solid #f3f4f6;}
+.dash-stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
+.dash-stat-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;}
+.dash-stat-info h4 { margin: 0; font-size: 24px; font-weight: 800; color: #1f2937; }
+.dash-stat-info p { margin: 4px 0 0 0; font-size: 13px; color: #6b7280; font-weight: 500; }
+
+.recent-section { background: white; padding: 24px; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); border: 1px solid #f3f4f6;}
+.recent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.recent-header h3 { margin: 0; font-size: 17px; color: #1f2937; font-weight: 700;}
+.recent-header span { color: #2563eb; font-size: 13px; font-weight: 600; cursor: pointer; transition: color 0.2s;}
+.recent-header span:hover { color: #1d4ed8; text-decoration: underline;}
+
+/* ===== COMMON SECTION ===== */
+.section { margin-bottom: 28px; }
+.section h3, .section-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 12px; }
+
+/* ===== ALBUM CARD GRID ===== */
+.album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+.album-card { background: white; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,.08); cursor: pointer; transition: all .2s ease; overflow: hidden; }
+.album-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,.14); }
+.album-cover { height: 120px; background: linear-gradient(135deg, #2563eb, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 42px; color: white; }
+.album-body { padding: 14px 16px; }
+.album-title { font-size: 14px; font-weight: 700; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.album-desc { font-size: 12px; color: #6b7280; margin-top: 4px; height: 32px; overflow: hidden; }
+.album-meta { margin-top: 10px; font-size: 11px; color: #9ca3af; }
+
+</style>
+</head>
+
+<body>
+
+<div class="layout">
+  <div class="sidebar">
+    <h2>Media Library</h2>
+    <div class="menu-item active" onclick="navigate('dashboard', this)">Dashboard</div>
+    <div class="menu-item" onclick="navigate('media',     this)">Media</div>
+    <div class="menu-item" onclick="navigate('album',     this)">Album</div>
+    <div class="menu-item" onclick="navigate('account',   this)">Tài khoản</div>
+  </div>
+
+  <div class="main">
+    <div class="header">
+      <strong id="pageTitle">Trang chủ</strong>
+      <div class="right">
+        <span id="userInfo"></span>
+        <button class="logout" onclick="logout()">Đăng xuất</button>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<!-- Modal xem trước Media (ảnh/video) -->
+<div class="modal-bg" id="mediaModal" onclick="closeModal(event)">
+  <div class="modal-box">
+    <div class="modal-info" style="border-bottom:1px solid #e5e7eb; padding:12px 16px;">
+      <button class="modal-close" onclick="closeModalBtn()">✕</button>
+      <span id="modalTitle" class="modal-title"></span>
+    </div>
+    <img id="modalImg" class="modal-img" src="" alt="" style="display:none"/>
+    
+<video id="modalVideo" class="modal-img" style="display:none" controls preload="metadata"></video>
+
+    <div id="modalIcon" class="media-thumb-icon" style="display:none; font-size:80px; height:200px;"></div>
+    <div class="modal-info">
+      <div id="modalTags" class="modal-tags"></div>
+      <div id="modalMeta" style="font-size:12px; color:#9ca3af; margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Sửa Album -->
+<div class="modal-bg" id="editAlbumModal" onclick="if(event.target===this) this.classList.remove('open')">
+  <div class="modal-box" style="max-width: 400px;">
+    <div class="modal-info" style="border-bottom:1px solid #e5e7eb; padding:12px 16px;">
+      <button class="modal-close" onclick="document.getElementById('editAlbumModal').classList.remove('open')">✕</button>
+      <span class="modal-title">✏️ Sửa thông tin Album</span>
+    </div>
+    <div style="padding: 20px;">
+      <input type="hidden" id="editAlbumId">
+      <div class="form-group" style="margin-top:0">
+        <label>Tên album</label>
+        <input id="editAlbumNameInput" type="text" placeholder="Nhập tên album mới...">
+      </div>
+      <div class="form-group">
+        <label>Mô tả</label>
+        <input id="editAlbumDescInput" type="text" placeholder="Mô tả (tuỳ chọn)...">
+      </div>
+      <button type="button" class="btn-primary" style="width:100%; margin-top:20px; height:40px;" onclick="submitEditAlbum()">💾 Lưu thay đổi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API  = "http://localhost:3000";       
+const MAPI = "http://localhost:3000/api";   
+
+const pageTitle = document.getElementById("pageTitle");
+const content   = document.getElementById("content");
+
+let selectedTags = [];
+let allTags      = [];
+let currentMediaList = []; 
+let batchSelections = []; 
+
+/* ===== INIT ===== */
+function init() {
+  let user = JSON.parse(localStorage.getItem("user"));
+  
+  if (!user) { 
+    user = { user_id: 1, username: "Guest User", email: "guest@example.com" };
+    localStorage.setItem("user", JSON.stringify(user));
+  }
+  
+  document.getElementById("userInfo").innerText = "Hi, " + (user.username || user.email);
+
+  const savedPage = localStorage.getItem("currentPage") || "dashboard";
+  const menuItems = document.querySelectorAll(".menu-item");
+  const pageIndex = { dashboard:0, media:1, album:2, account:3 };
+  const idx = pageIndex[savedPage] ?? 0;
+
+  menuItems.forEach(m => m.classList.remove("active"));
+  if(menuItems[idx]) menuItems[idx].classList.add("active");
+
+  const map = { dashboard:renderDashboard, media:renderMedia, album:renderAlbum, account:renderAccount };
+  map[savedPage]?.();
+}
+
+/* ===== NAVIGATE ===== */
+function navigate(page, el) {
+  document.querySelectorAll(".menu-item").forEach(m => m.classList.remove("active"));
+  el.classList.add("active");
+  localStorage.setItem("currentPage", page);
+  const map = { dashboard:renderDashboard, media:renderMedia, album:renderAlbum, account:renderAccount };
+  const titles = { dashboard:"Trang chủ", media:"Media", album:"Album", account:"Tài khoản" };
+  pageTitle.innerText = titles[page] || page;
+  map[page]?.();
+}
+
+/* ===== DASHBOARD ===== */
+async function renderDashboard() {
+  pageTitle.innerText = "Trang chủ";
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  content.innerHTML = `<div class="media-empty">⏳ Đang tải dữ liệu tổng quan...</div>`;
+
+  try {
+    const [resMedia, resAlbums] = await Promise.all([
+      fetch(`${MAPI}/media/${user.user_id}`),
+      fetch(`${API}/api/albums/${user.user_id}`)
+    ]);
+
+    const media = resMedia.ok ? await resMedia.json() : [];
+    const albums = resAlbums.ok ? await resAlbums.json() : [];
+
+    const totalMedia = media.length;
+    const imagesCount = media.filter(m => m.media_type === 'image').length;
+    const videosCount = media.filter(m => m.media_type === 'video').length;
+    const totalAlbums = albums.length;
+
+    const recentMedia = media.slice(0, 4);
+    let recentHtml = '';
+
+    if (recentMedia.length > 0) {
+      recentHtml = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px;">
+          ${recentMedia.map(m => {
+            let thumbHTML = "";
+            if (m.media_type === "image") {
+              thumbHTML = `<img style="width:100%; height:130px; object-fit:cover; display:block; border-radius:8px; background:#f3f4f6;" src="${API}${m.file_url}" onerror="this.style.display='none'">`;
+            } else if (m.media_type === "video") {
+              thumbHTML = `<video style="width:100%; height:130px; object-fit:cover; display:block; border-radius:8px; background:#f3f4f6;" src="${API}${m.file_url}#t=0.1" preload="metadata" muted></video>`;
+            } else {
+              thumbHTML = `<div style="width:100%; height:130px; display:flex; align-items:center; justify-content:center; font-size:32px; background:#f9fafb; border-radius:8px;">📄</div>`;
+            }
+            return `
+              <div style="cursor:pointer; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'" onclick="navigate('media', document.querySelectorAll('.menu-item')[1])">
+                ${thumbHTML}
+                <div style="font-size:13px; font-weight:600; color:#1f2937; margin-top:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.title}</div>
+                <div style="font-size:11px; color:#9ca3af; margin-top:2px;">${formatDate(m.uploaded_at)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } else {
+      recentHtml = `<div class="media-empty" style="padding: 20px 0;">📭 Chưa có ảnh/video nào. Hãy bắt đầu tải lên nhé!</div>`;
+    }
+
+    content.innerHTML = `
+      <div class="hero-banner">
+        <h2>Chào mừng trở lại, ${user.username || 'bạn'}! 👋</h2>
+        <p>Trung tâm quản lý, lưu trữ và sắp xếp không gian sáng tạo của bạn. Hãy để mọi khoảnh khắc luôn được ngăn nắp và an toàn.</p>
+        <div class="hero-buttons">
+          <button class="btn-white" onclick="navigate('media', document.querySelectorAll('.menu-item')[1])">☁️ Tải lên ngay</button>
+          <button class="btn-outline" onclick="navigate('album', document.querySelectorAll('.menu-item')[2])">🗂 Tạo Album mới</button>
+        </div>
+      </div>
+
+      <div class="dash-stats">
+        <div class="dash-stat-card">
+          <div class="dash-stat-icon" style="background: #eff6ff; color: #2563eb;">📁</div>
+          <div class="dash-stat-info">
+            <h4>${totalMedia}</h4>
+            <p>Tổng file Media</p>
+          </div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-icon" style="background: #fdf4ff; color: #9333ea;">🖼️</div>
+          <div class="dash-stat-info">
+            <h4>${imagesCount}</h4>
+            <p>Hình ảnh</p>
+          </div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-icon" style="background: #fef2f2; color: #dc2626;">🎬</div>
+          <div class="dash-stat-info">
+            <h4>${videosCount}</h4>
+            <p>Video</p>
+          </div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-icon" style="background: #fffbeb; color: #d97706;">🗂️</div>
+          <div class="dash-stat-info">
+            <h4>${totalAlbums}</h4>
+            <p>Album đã tạo</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <div class="recent-header">
+          <h3>⏱️ Tải lên gần đây</h3>
+          <span onclick="navigate('media', document.querySelectorAll('.menu-item')[1])">Xem tất cả →</span>
+        </div>
+        ${recentHtml}
+      </div>
+    `;
+  } catch (err) {
+    content.innerHTML = `<div class="media-empty">❌ Lỗi kết nối, không thể tải dữ liệu tổng quan.</div>`;
+  }
+}
+
+/* ===== MEDIA ===== */
+async function renderMedia() {
+  pageTitle.innerText = "Media";
+  selectedTags = [];
+
+  try {
+    const r = await fetch(`${API}/tags`);
+    allTags  = await r.json();
+  } catch(e) { allTags = []; }
+
+  content.innerHTML = `
+    <div class="card">
+      <h3 style="margin:0 0 16px">⬆️ Upload Media</h3>
+      <div class="upload-form">
+        <div class="full">
+          <input type="file" id="mediaFile" accept="image/*,video/*" onchange="previewFile(this)">
+        </div>
+        <div>
+          <input type="text" id="mediaTitle" placeholder="Tiêu đề media">
+        </div>
+        <div class="tag-input-wrap" id="tagWrap">
+          <input type="text" id="tagInput" placeholder="🏷 Thêm tag..."
+                 oninput="filterTags(this.value)"
+                 onkeydown="tagKeydown(event)"
+                 autocomplete="off">
+          <div class="tag-suggestions" id="tagSuggestions"></div>
+          <div class="tag-chips" id="tagChips"></div>
+        </div>
+        <div>
+          <button type="button" class="btn-upload" id="uploadBtn" onclick="uploadMedia()">⬆️ Upload</button>
+        </div>
+      </div>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-text" id="progressText">Đang upload...</div>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin: 24px 0 14px;">
+      <div class="section-title" style="margin:0;">📂 Media của bạn</div>
+      <input type="text" id="searchMediaInput" placeholder="🔍 Tìm theo tên hoặc #tag..."
+             oninput="handleSearchMedia(this.value)"
+             style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; width: 250px; outline: none;">
+    </div>
+
+    <div id="mediaGrid"><div class="media-empty">⏳ Đang tải...</div></div>
+  `;
+
+  loadMediaGrid();
+}
+
+function handleSearchMedia(query) {
+  const q = query.toLowerCase().trim();
+  const items = document.querySelectorAll('#mediaGrid .media-item');
+  let visibleCount = 0;
+
+  items.forEach(item => {
+    const searchData = item.getAttribute('data-search') || '';
+    if (searchData.includes(q)) {
+      item.style.display = '';
+      visibleCount++;
+    } else {
+      item.style.display = 'none';
+    }
+  });
+
+  let emptyMsg = document.getElementById("searchEmptyMsg");
+  if (visibleCount === 0 && items.length > 0) {
+    if (!emptyMsg) {
+      const gridContainer = document.querySelector('#mediaGrid .media-grid');
+      if (gridContainer) {
+        gridContainer.insertAdjacentHTML('beforeend', '<div id="searchEmptyMsg" class="media-empty" style="grid-column: 1 / -1; padding: 40px 0;">📭 Không tìm thấy kết quả nào phù hợp!</div>');
+      }
+    } else emptyMsg.style.display = 'block';
+  } else if (emptyMsg) emptyMsg.style.display = 'none';
+}
+
+function previewFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const title = document.getElementById("mediaTitle");
+  if (!title.value) title.value = file.name.replace(/\.[^.]+$/, "");
+}
+
+function filterTags(val) {
+  const box = document.getElementById("tagSuggestions");
+  const q   = val.trim().toLowerCase();
+  const already = selectedTags.map(t => t.tag_id);
+  const filtered = allTags.filter(t => t.tag_name.toLowerCase().includes(q) && !already.includes(t.tag_id));
+  if (!q && !filtered.length) { box.style.display="none"; return; }
+  box.style.display = "block";
+  box.innerHTML = filtered.map(t => `<div class="tag-suggestion-item" onclick="selectTag(${t.tag_id},'${t.tag_name}')">#${t.tag_name}</div>`).join("") + (q ? `<div class="tag-suggestion-item" style="color:#16a34a" onclick="createAndSelectTag('${val.trim()}')">➕ Tạo tag "<b>${val.trim()}</b>"</div>` : "");
+}
+
+function tagKeydown(e) { if (e.key === "Escape") document.getElementById("tagSuggestions").style.display="none"; }
+
+function selectTag(id, name) {
+  if (selectedTags.find(t => t.tag_id === id)) return;
+  selectedTags.push({ tag_id: id, tag_name: name });
+  renderChips();
+  document.getElementById("tagInput").value = "";
+  document.getElementById("tagSuggestions").style.display = "none";
+}
+
+async function createAndSelectTag(name) {
+  try {
+    const res  = await fetch(`${API}/tags`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ tag_name: name }) });
+    const data = await res.json();
+    if (res.ok) { allTags.push({ tag_id: data.tag_id, tag_name: name }); selectTag(data.tag_id, name); }
+    else { alert(data.error); }
+  } catch(e) { alert("Lỗi tạo tag"); }
+}
+
+function removeTag(id) { selectedTags = selectedTags.filter(t => t.tag_id !== id); renderChips(); }
+
+function renderChips() { document.getElementById("tagChips").innerHTML = selectedTags.map(t => `<span class="tag-chip">#${t.tag_name} <span class="rm" onclick="removeTag(${t.tag_id})">×</span></span>`).join(""); }
+
+async function uploadMedia() {
+  const file  = document.getElementById("mediaFile").files[0];
+  const title = document.getElementById("mediaTitle").value.trim();
+  const user  = JSON.parse(localStorage.getItem("user"));
+
+  if (!file)  { alert("Vui lòng chọn file"); return; }
+  if (!title) { alert("Vui lòng nhập tiêu đề"); return; }
+
+  const formData = new FormData();
+  formData.append("file", file); formData.append("title", title); formData.append("user_id", user.user_id); formData.append("tags", JSON.stringify(selectedTags.map(t => t.tag_id)));
+
+  const wrap = document.getElementById("progressWrap"); const fill = document.getElementById("progressFill"); const txt  = document.getElementById("progressText");
+  wrap.style.display = "block"; fill.style.width = "30%"; fill.style.background = "#2563eb"; txt.innerText = "Đang upload..."; document.getElementById("uploadBtn").disabled = true;
+
+  try {
+    const res  = await fetch(`${MAPI}/media/upload`, { method:"POST", body: formData });
+    const data = await res.json();
+    if (res.ok) {
+      fill.style.width = "100%"; txt.innerText = "✅ Upload thành công!";
+      document.getElementById("mediaFile").value  = ""; document.getElementById("mediaTitle").value = ""; selectedTags = []; renderChips();
+      setTimeout(() => { wrap.style.display="none"; fill.style.width="0"; }, 1500);
+      loadMediaGrid();
+    } else { txt.innerText = "❌ " + (data.error || "Upload thất bại"); fill.style.background = "#dc2626"; }
+  } catch(e) { txt.innerText = "❌ Không kết nối được server"; fill.style.background = "#dc2626"; }
+  document.getElementById("uploadBtn").disabled = false;
+}
+
+async function loadMediaGrid() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  const grid = document.getElementById("mediaGrid");
+  if (!grid) return;
+  try {
+    const res = await fetch(`${MAPI}/media/${user.user_id}`);
+    currentMediaList = await res.json(); 
+    renderMediaItems(currentMediaList); 
+  } catch (e) { grid.innerHTML = `<div class="media-empty">❌ Không tải được media</div>`; }
+}
+
+function renderMediaItems(items) {
+  const grid = document.getElementById("mediaGrid");
+  if (!grid) return;
+  if (!items.length) { grid.innerHTML = `<div class="media-empty">📭 Không tìm thấy media nào!</div>`; return; }
+
+  grid.innerHTML = `<div class="media-grid">${items.map(m => {
+    let thumbHTML = "";
+    if (m.media_type === "image") thumbHTML = `<img class="media-thumb" src="${API}${m.file_url}" alt="${m.title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`;
+    else if (m.media_type === "video") thumbHTML = `<video class="media-thumb" src="${API}${m.file_url}#t=0.1" preload="metadata" muted></video>`;
+    else thumbHTML = `<div class="media-thumb-icon">📄</div>`;
+
+    const searchKeywords = (m.title + ' ' + (m.tags || '')).toLowerCase().replace(/"/g, '&quot;');
+    return `
+      <div class="media-item" data-search="${searchKeywords}">
+        <div style="cursor:pointer" onclick="openModal(${JSON.stringify(m).replace(/"/g,'&quot;')})">${thumbHTML}</div>
+        <div class="media-info">
+          <div class="media-title">${m.title}</div>
+          <div class="media-tags">${(m.tags || '').split(',').filter(Boolean).map(t => `<span class="media-tag">#${t}</span>`).join('')}</div>
+          <div class="media-meta">${m.media_type} · ${formatDate(m.uploaded_at)}</div>
+          <button type="button" onclick="deleteMedia(${m.media_id})" style="margin-top:8px;width:100%;padding:4px;border:none;border-radius:6px;cursor:pointer;font-size:11px;background:#fee2e2;color:#991b1b">🗑 Xóa media</button>
+        </div>
+      </div>
+    `;
+  }).join("")}</div>`;
+}
+
+async function deleteMedia(media_id) {
+  if (!confirm("Xóa media này?")) return;
+  const res = await fetch(`${MAPI}/media/${media_id}`, { method: "DELETE" });
+  if (res.ok) loadMediaGrid(); else alert("Xóa thất bại");
+}
+
+/* ── Modal ── */
+function openModal(m) {
+  document.getElementById("modalTitle").innerText = m.title;
+  const img   = document.getElementById("modalImg");
+  const video = document.getElementById("modalVideo");
+  const icon  = document.getElementById("modalIcon");
+
+  img.style.display   = "none"; video.style.display = "none"; video.pause(); video.src = ""; icon.style.display  = "none";
+
+  if (m.media_type === "image") { img.src = API + m.file_url; img.style.display = "block"; } 
+  else if (m.media_type === "video") { video.src = API + m.file_url; video.style.display = "block"; video.load(); video.play().catch(()=>{}); } 
+  else { icon.style.display = "flex"; icon.innerText = "📄"; }
+
+  document.getElementById("modalTags").innerHTML = (m.tags||'').split(',').filter(Boolean).map(t=>`<span class="modal-tag">#${t}</span>`).join('');
+  document.getElementById("modalMeta").innerText = `Loại: ${m.media_type} · Upload: ${formatDate(m.uploaded_at)}`;
+  document.getElementById("mediaModal").classList.add("open");
+}
+
+function closeModalBtn() {
+  document.getElementById("mediaModal").classList.remove("open");
+  const video = document.getElementById("modalVideo");
+  if (video) { video.pause(); video.src = ""; }
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById("mediaModal")) {
+    document.getElementById("mediaModal").classList.remove("open");
+    const video = document.getElementById("modalVideo");
+    if (video) { video.pause(); video.remove(); }
+  }
+}
+
+function formatDuration(sec) {
+  if (!sec) return "";
+  const m = Math.floor(sec / 60); const s = sec % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `0:${String(s).padStart(2,'0')}`;
+}
+function formatDate(d) { return !d ? "" : new Date(d).toLocaleDateString("vi-VN"); }
+
+/* ===== ALBUM ===== */
+async function renderAlbum() {
+  pageTitle.innerText = "Album";
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  let albums = [];
+  try {
+    const r = await fetch(`${MAPI}/albums/${user.user_id}`);
+    albums = await r.json();
+  } catch(e) {}
+
+  content.innerHTML = `
+    <div class="card">
+      <h3 style="margin:0 0 16px">📁 Tạo album mới</h3>
+      <div style="display:flex;gap:12px;align-items:center">
+        <input id="albumName" type="text" placeholder="Tên album" style="flex:1;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">
+        <input id="albumDesc" type="text" placeholder="Mô tả (tuỳ chọn)" style="flex:2;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">
+        <button type="button" onclick="createAlbum()" style="padding:9px 20px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">Tạo</button>
+      </div>
+    </div>
+
+    <!-- Thanh tìm kiếm nhanh Album -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin: 24px 0 14px;">
+      <div class="section-title" style="margin:0;">📂 Album của bạn</div>
+      <input type="text" id="searchAlbumInput" placeholder="🔍 Tìm kiếm album..."
+             oninput="handleSearchAlbum(this.value)"
+             style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; width: 250px; outline: none;">
+    </div>
+
+    <div id="albumGridContainer">
+      ${albums.length === 0
+        ? `<div class="media-empty">📭 Chưa có album nào</div>`
+        : `<div class="media-grid" id="albumGrid">${albums.map(a => {
+            
+            let coverHTML = `<div style="height:140px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:40px">🗂</div>`;
+            if (a.cover_url) {
+              if (a.cover_type === 'video') coverHTML = `<video style="width:100%;height:140px;object-fit:cover;display:block;" src="${API}${a.cover_url}#t=0.1" preload="metadata" muted></video>`;
+              else coverHTML = `<img style="width:100%;height:140px;object-fit:cover;display:block;" src="${API}${a.cover_url}" onerror="this.style.display='none'">`;
+            }
+
+            return `
+            <div class="media-item album-item" data-name="${a.album_name.toLowerCase().replace(/"/g,'&quot;')}" style="cursor:pointer" onclick="openAlbum(${a.album_id},'${a.album_name.replace(/'/g,"\\'")}')">
+              <div style="position:relative; background:#f3f4f6;">
+                ${coverHTML}
+                <span style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600;">${a.item_count || 0} mục</span>
+              </div>
+              <div class="media-info">
+                <div class="media-title">${a.album_name}</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px">${a.description || ''}</div>
+                <div class="media-meta">Tạo ngày ${formatDate(a.created_at)}</div>
+                
+                <div style="display:flex;gap:6px;margin-top:8px">
+                  <button type="button" onclick="event.stopPropagation();openEditAlbum(${a.album_id}, '${a.album_name.replace(/'/g,"\\'")}', '${(a.description||'').replace(/'/g,"\\'")}')"
+                    style="flex:1;padding:4px;border:none;border-radius:6px;cursor:pointer;font-size:11px;background:#eff6ff;color:#2563eb">
+                    ✏️ Sửa
+                  </button>
+                  <button type="button" onclick="event.stopPropagation();deleteAlbum(${a.album_id})"
+                    style="flex:1;padding:4px;border:none;border-radius:6px;cursor:pointer;font-size:11px;background:#fee2e2;color:#991b1b">
+                    🗑 Xóa
+                  </button>
+                </div>
+              </div>
+            </div>`
+          }).join('')}
+          </div>`
+      }
+    </div>
+
+    <!-- Modal album -->
+    <div id="albumModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;padding:20px;align-items:center;justify-content:center;">
+      <div style="background:white;width:100%;max-width:900px;max-height:90vh;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+          <h3 id="albumModalTitle" style="margin:0;font-size:18px"></h3>
+          <button type="button" onclick="document.getElementById('albumModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280">✕</button>
+        </div>
+        <div style="display:flex;border-bottom:1px solid #e5e7eb;flex-shrink:0;">
+          <button type="button" id="tabMedia" onclick="switchTab('media')" style="flex:1;padding:12px;border:none;background:#eff6ff;color:#2563eb;font-weight:600;cursor:pointer;font-size:14px">📷 Media trong album</button>
+          <button type="button" id="tabAdd" onclick="switchTab('add')" style="flex:1;padding:12px;border:none;background:white;color:#6b7280;cursor:pointer;font-size:14px">➕ Thêm media (Hàng loạt)</button>
+        </div>
+        <div id="tabContentMedia" style="padding:20px;overflow-y:auto;flex:1;"></div>
+        <div id="tabContentAdd" style="padding:20px;overflow-y:auto;flex:1;display:none;"></div>
+      </div>
+    </div>
+  `;
+}
+
+function handleSearchAlbum(query) {
+  const q = query.toLowerCase().trim();
+  const items = document.querySelectorAll('#albumGrid .album-item');
+  let visibleCount = 0;
+
+  items.forEach(item => {
+    const nameData = item.getAttribute('data-name') || '';
+    if (nameData.includes(q)) {
+       item.style.display = '';
+       visibleCount++;
+    } else {
+       item.style.display = 'none';
+    }
+  });
+
+  let emptyMsg = document.getElementById("searchAlbumEmptyMsg");
+  if (visibleCount === 0 && items.length > 0) {
+    if (!emptyMsg) {
+      document.getElementById('albumGrid').insertAdjacentHTML('beforeend', '<div id="searchAlbumEmptyMsg" class="media-empty" style="grid-column: 1 / -1; padding: 40px 0;">📭 Không tìm thấy album nào phù hợp!</div>');
+    } else { emptyMsg.style.display = 'block'; }
+  } else if (emptyMsg) { emptyMsg.style.display = 'none'; }
+}
+
+function openEditAlbum(id, name, desc) {
+  document.getElementById("editAlbumId").value = id;
+  document.getElementById("editAlbumNameInput").value = name;
+  document.getElementById("editAlbumDescInput").value = desc;
+  document.getElementById("editAlbumModal").classList.add("open");
+}
+
+async function submitEditAlbum() {
+  const id = document.getElementById("editAlbumId").value;
+  const name = document.getElementById("editAlbumNameInput").value.trim();
+  const desc = document.getElementById("editAlbumDescInput").value.trim();
+
+  if(!name) { alert("Tên album không được để trống!"); return; }
+
+  const res = await fetch(`${MAPI}/albums/${id}`, {
+    method: "PUT", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ album_name: name, description: desc })
+  });
+
+  if(res.ok) {
+     document.getElementById('editAlbumModal').classList.remove('open');
+     renderAlbum(); 
+  } else { 
+     alert("Cập nhật thất bại"); 
+  }
+}
+
+let currentAlbumId = null;
+
+async function openAlbum(album_id, name) {
+  currentAlbumId = album_id;
+  document.getElementById("albumModalTitle").innerText = `📁 ${name}`;
+  document.getElementById("albumModal").style.display = "flex";
+  switchTab("media");
+}
+
+async function switchTab(tab) {
+  const tabMedia = document.getElementById("tabMedia");
+  const tabAdd   = document.getElementById("tabAdd");
+  const contentMedia = document.getElementById("tabContentMedia");
+  const contentAdd   = document.getElementById("tabContentAdd");
+
+  if (tab === "media") {
+    tabMedia.style.background = "#eff6ff"; tabMedia.style.color = "#2563eb"; tabMedia.style.fontWeight = "600";
+    tabAdd.style.background = "white"; tabAdd.style.color = "#6b7280"; tabAdd.style.fontWeight = "400";
+    contentMedia.style.display = "block"; contentAdd.style.display   = "none";
+    await loadAlbumMedia();
+  } else {
+    tabAdd.style.background = "#eff6ff"; tabAdd.style.color = "#2563eb"; tabAdd.style.fontWeight = "600";
+    tabMedia.style.background = "white"; tabMedia.style.color = "#6b7280"; tabMedia.style.fontWeight = "400";
+    contentAdd.style.display   = "block"; contentMedia.style.display = "none";
+    await loadAddMedia();
+  }
+}
+
+async function loadAlbumMedia() {
+  const box = document.getElementById("tabContentMedia");
+  box.innerHTML = "⏳ Đang tải...";
+
+  let items = [];
+  try {
+    const res = await fetch(`${MAPI}/album-media/${currentAlbumId}`);
+    items = await res.json();
+  } catch(e) { box.innerHTML = `<div class="media-empty">❌ Không tải được</div>`; return; }
+
+  if (!items.length) { box.innerHTML = `<div class="media-empty">📭 Album chưa có media nào. Chuyển sang tab "Thêm media" để chọn nhé!</div>`; return; }
+
+  const groups = {};
+  items.forEach(m => {
+    const dateKey = m.uploaded_at ? new Date(m.uploaded_at).toISOString().slice(0,10) : "unknown";
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(m);
+  });
+  const sortedDates = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+
+  let html = `<div style="padding:4px 0">`;
+  sortedDates.forEach(dateKey => {
+    const label = dateKey === "unknown" ? "Không rõ ngày" : new Date(dateKey).toLocaleDateString("vi-VN", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+    html += `
+      <div style="display:flex;align-items:center;gap:10px;margin:18px 0 10px">
+        <span style="font-size:16px">📅</span>
+        <span style="font-size:14px;font-weight:700;color:#1f2937">${label}</span>
+        <div style="flex:1;height:1px;background:#e5e7eb"></div>
+        <span style="font-size:12px;color:#9ca3af">${groups[dateKey].length} ảnh/video</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px">
+    `;
+
+    groups[dateKey].forEach(m => {
+      const dur = m.duration_seconds ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.7);color:white;font-size:10px;padding:2px 5px;border-radius:4px">${formatDuration(m.duration_seconds)}</span>` : "";
+      const thumb = m.media_type === "image" ? `<img style="width:100%;height:130px;object-fit:cover;display:block" src="${API}${m.file_url}" alt="${m.title}" onerror="this.style.display='none'">` : m.media_type === "video" ? `<video style="width:100%;height:130px;object-fit:cover;display:block" src="${API}${m.file_url}#t=0.1" preload="metadata" muted></video>` : `<div style="width:100%;height:130px;display:flex;align-items:center;justify-content:center;font-size:36px;background:#f9fafb">📄</div>`;
+      html += `
+        <div style="width:160px;background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);flex-shrink:0">
+          <div style="position:relative;cursor:pointer" onclick="openModal(${JSON.stringify(m).replace(/"/g,'&quot;')})">${thumb}${dur}</div>
+          <div style="padding:8px 10px">
+            <div style="font-size:12px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.title}</div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:2px">${m.media_type}${m.sort_order!=null?' · #'+m.sort_order:''}</div>
+            <button type="button" onclick="removeFromAlbum(${m.media_id})" style="margin-top:6px;width:100%;padding:3px;border:none;border-radius:5px;cursor:pointer;font-size:11px;background:#fee2e2;color:#991b1b">🗑 Xóa khỏi album</button>
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  });
+  html += `</div>`;
+  box.innerHTML = html;
+}
+
+async function loadAddMedia() {
+  const box  = document.getElementById("tabContentAdd");
+  const user = JSON.parse(localStorage.getItem("user"));
+  box.innerHTML = "⏳ Đang tải...";
+
+  batchSelections = []; 
+
+  const [r1, r2] = await Promise.all([
+    fetch(`${MAPI}/media/${user.user_id}`),
+    fetch(`${MAPI}/album-media/${currentAlbumId}`)
+  ]);
+  const allMedia    = await r1.json();
+  const albumMedia  = await r2.json();
+  const inAlbumIds  = new Set(albumMedia.map(m => m.media_id));
+
+  if (!allMedia.length) { box.innerHTML = `<div class="media-empty">Bạn chưa có media nào</div>`; return; }
+
+  let topBar = `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#eff6ff; border-radius:8px; margin-bottom:16px; border:1px solid #bfdbfe; position:sticky; top:0; z-index:100;">
+       <span style="font-weight:600; color:#1d4ed8;">Đã chọn: <span id="batchCount">0</span> mục</span>
+       <button id="batchAddBtn" type="button" disabled style="padding:8px 16px; background:#93c5fd; color:white; border:none; border-radius:6px; font-weight:600; cursor:not-allowed; transition: background 0.2s;" onclick="submitBatchAdd()">➕ Thêm vào Album</button>
+    </div>
+  `;
+
+  box.innerHTML = topBar + `<div class="media-grid">${allMedia.map(m => {
+    const thumb = m.media_type === "image" ? `<img class="media-thumb" src="${API}${m.file_url}" alt="${m.title}">` : m.media_type === "video" ? `<video id="vid-${m.media_id}" class="media-thumb" src="${API}${m.file_url}#t=0.1" preload="metadata" muted></video>` : `<div class="media-thumb-icon">📄</div>`;
+    const inAlbum = inAlbumIds.has(m.media_id);
+    
+    return `
+    <div class="media-item" style="position:relative; ${inAlbum ? 'opacity:0.5;' : ''}">
+      ${!inAlbum ? `
+        <input type="checkbox" id="chk-${m.media_id}" onchange="updateBatchSelection(this, ${m.media_id})" style="position:absolute; top:10px; left:10px; z-index:10; width:20px; height:20px; cursor:pointer;">
+      ` : `
+        <span style="position:absolute; top:10px; left:10px; z-index:10; background:#10b981; color:white; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold;">Đã có</span>
+      `}
+      <div style="cursor:pointer" onclick="openModal(${JSON.stringify(m).replace(/"/g,'&quot;')})">
+        ${thumb}
+      </div>
+      <div class="media-info" style="cursor:pointer;" onclick="${!inAlbum ? `document.getElementById('chk-${m.media_id}').click()` : ''}">
+        <div class="media-title">${m.title}</div>
+        <div class="media-meta">${m.media_type} · ${formatDate(m.uploaded_at)}</div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+window.updateBatchSelection = function(checkbox, media_id) {
+   if (checkbox.checked) batchSelections.push(media_id);
+   else batchSelections = batchSelections.filter(id => id !== media_id);
+   
+   document.getElementById('batchCount').innerText = batchSelections.length;
+   const btn = document.getElementById('batchAddBtn');
+   if (batchSelections.length > 0) {
+       btn.style.background = '#2563eb';
+       btn.style.cursor = 'pointer';
+       btn.disabled = false;
+   } else {
+       btn.style.background = '#93c5fd';
+       btn.style.cursor = 'not-allowed';
+       btn.disabled = true;
+   }
+}
+
+async function submitBatchAdd() {
+  const btn = document.getElementById('batchAddBtn');
+  btn.innerText = '⏳ Đang thêm...';
+  btn.disabled = true;
+
+  for (const id of batchSelections) {
+     let dur = null;
+     const vid = document.getElementById(`vid-${id}`);
+     if (vid) dur = Math.round(vid.duration) || null;
+
+     try {
+       await fetch(`${MAPI}/album-media`, {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ album_id: currentAlbumId, media_id: id, duration_seconds: dur })
+       });
+     } catch(e) { console.error(e); }
+  }
+
+  batchSelections = []; 
+  await loadAddMedia(); 
+  switchTab('media');   
+}
+
+async function removeFromAlbum(media_id) {
+  if (!confirm("Xóa media này khỏi album?")) return;
+  const res = await fetch(`${MAPI}/album-media/${currentAlbumId}/${media_id}`, { method: "DELETE" });
+  if (res.ok) loadAlbumMedia(); else alert("Xóa thất bại");
+}
+
+async function createAlbum() {
+  const name = document.getElementById("albumName").value.trim();
+  const desc = document.getElementById("albumDesc").value.trim();
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!name) { alert("Nhập tên album"); return; }
+  const res = await fetch(`${MAPI}/albums`, {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ user_id: user.user_id, album_name: name, description: desc })
+  });
+  if (res.ok) renderAlbum(); else alert("Tạo album thất bại");
+}
+
+async function deleteAlbum(album_id) {
+  if (!confirm("Xóa album này?")) return;
+  const res = await fetch(`${MAPI}/albums/${album_id}`, { method: "DELETE" });
+  if (res.ok) renderAlbum(); else alert("Xóa thất bại");
+}
+
+/* ===== ACCOUNT ===== */
+async function renderAccount() {
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  let mediaCount = 0;
+  let albumCount = 0;
+  let tagCount   = 0;
+
+  try {
+    /* ===== FETCH MEDIA ===== */
+    const rMedia  = await fetch(`${MAPI}/media/${user.user_id}`);
+    const media   = await rMedia.json();
+    mediaCount    = media.length;
+
+    /* ===== FETCH ALBUM ===== */
+    const rAlbum  = await fetch(`${MAPI}/albums/${user.user_id}`);
+    const albums  = await rAlbum.json();
+    albumCount    = albums.length;
+
+    /* ===== COUNT TAG ===== */
+    const tagSet = new Set();
+    media.forEach(m =>
+      (m.tags || "")
+        .split(",")
+        .filter(Boolean)
+        .forEach(t => tagSet.add(t))
+    );
+    tagCount = tagSet.size;
+
+  } catch (e) {
+    console.error("RENDER ACCOUNT ERROR:", e);
+  }
+
+  content.innerHTML = `
+    <div class="card">
+      <div class="profile-header">
+        <div class="avatar">
+          ${(user.username || "U").charAt(0).toUpperCase()}
+        </div>
+        <div class="profile-info">
+          <h3>${user.username || "Tài khoản ảo"}</h3>
+          <p>${user.email}</p>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <h2>${mediaCount}</h2>
+          <p>Media đã upload</p>
+        </div>
+        <div class="stat">
+          <h2>${albumCount}</h2>
+          <p>Album đã tạo</p>
+        </div>
+        <div class="stat">
+          <h2>${tagCount}</h2>
+          <p>Tag đã sử dụng</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Thay đổi thông tin tài khoản</h3>
+
+      <div class="form-group">
+        <label>Email mới</label>
+        <input id="newEmail">
+        <button class="btn-primary" onclick="changeEmail()">Đổi email</button>
+      </div>
+
+      <hr style="margin:20px 0">
+
+      <div class="form-group">
+        <label>Mật khẩu mới</label>
+        <input id="newPassword" type="password">
+        <button class="btn-primary" onclick="changePassword()">Đổi mật khẩu</button>
+      </div>
+    </div>
+  `;
+}
+
+async function changeEmail() {
+  const newEmail = document.getElementById("newEmail").value.trim();
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!newEmail) { alert("Nhập email mới"); return; }
+  const res  = await fetch(`${API}/auth/update-email`, {
+    method:"PUT", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ user_id: user.user_id, newEmail })
+  });
+  const data = await res.json();
+  if (res.ok) { alert("Đổi email thành công ✅"); user.email=newEmail; localStorage.setItem("user",JSON.stringify(user)); renderAccount(); }
+  else alert(data.error);
+}
+
+async function changePassword() {
+  const newPassword = document.getElementById("newPassword").value.trim();
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!newPassword) { alert("Nhập mật khẩu mới"); return; }
+  const res  = await fetch(`${API}/auth/update-password`, {
+    method:"PUT", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ user_id: user.user_id, newPassword })
+  });
+  const data = await res.json();
+  res.ok ? alert("Đổi mật khẩu thành công ✅") : alert(data.error);
+}
+
+function logout() { localStorage.clear(); location.href="login.html"; }
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

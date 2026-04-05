@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Đăng nhập</title>
+  <link rel="stylesheet" href="./css/auth.css">
+</head>
+<body>
+
+<div class="auth-box">
+  <h2>Đăng nhập</h2>
+
+  <input id="emailInput" type="email" placeholder="Email">
+  <input id="passwordInput" type="password" placeholder="Mật khẩu">
+
+  <button type="button" onclick="login()">Đăng nhập</button>
+
+  <div class="auth-links">
+    <a href="./forgot.html">Quên mật khẩu?</a>
+    <a href="./register.html">Tạo tài khoản</a>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:3000";
+
+async function login() {
+  const email = document.getElementById("emailInput").value.trim();
+  const password = document.getElementById("passwordInput").value.trim();
+
+  if (!email || !password) {
+    alert("Vui lòng nhập email và mật khẩu");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "Đăng nhập thất bại");
+      return;
+    }
+
+    localStorage.setItem("user", JSON.stringify(data.user));
+    window.location.href = "index.html";
+  } catch (e) {
+    alert("Không kết nối được server");
+  }
+}
+</script>
+</body>
+</html>
