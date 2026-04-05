@@ -168,6 +168,20 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
 .recent-header span { color: #2563eb; font-size: 13px; font-weight: 600; cursor: pointer; transition: color 0.2s;}
 .recent-header span:hover { color: #1d4ed8; text-decoration: underline;}
 
+/* ===== COMMON SECTION ===== */
+.section { margin-bottom: 28px; }
+.section h3, .section-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 12px; }
+
+/* ===== ALBUM CARD GRID ===== */
+.album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+.album-card { background: white; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,.08); cursor: pointer; transition: all .2s ease; overflow: hidden; }
+.album-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,.14); }
+.album-cover { height: 120px; background: linear-gradient(135deg, #2563eb, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 42px; color: white; }
+.album-body { padding: 14px 16px; }
+.album-title { font-size: 14px; font-weight: 700; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.album-desc { font-size: 12px; color: #6b7280; margin-top: 4px; height: 32px; overflow: hidden; }
+.album-meta { margin-top: 10px; font-size: 11px; color: #9ca3af; }
+
 </style>
 </head>
 
@@ -187,7 +201,7 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
       <strong id="pageTitle">Trang chủ</strong>
       <div class="right">
         <span id="userInfo"></span>
-        <button class="logout" onclick="logout()">Đăng xuất</button>
+        <button id="authBtn" class="logout" onclick="handleAuthAction()">Đăng xuất</button>
       </div>
     </div>
     <div class="content" id="content"></div>
@@ -252,28 +266,37 @@ let cachedAlbumsList = null;
 let currentMediaList = []; 
 let batchSelections = []; 
 
-/* ===== REDIRECT SAFE ===== */
-function redirectToLogin() {
-  try {
+/* ===== AUTH ACTION ===== */
+function handleAuthAction() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (user) {
+    logout();
+  } else {
     window.location.href = "login.html";
-  } catch (err) {
-    document.body.innerHTML = `
-      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#f3f4f6; text-align:center; padding:20px;">
-        <h2 style="color:#dc2626; margin-bottom:10px;">Bạn chưa đăng nhập!</h2>
-        <p style="color:#374151; margin-bottom:15px;">Môi trường xem trước không hỗ trợ tự động chuyển trang.</p>
-        <p style="color:#374151;">Vui lòng mở trực tiếp file <b>login.html</b> trên trình duyệt của bạn nhé!</p>
-      </div>
-    `;
   }
+}
+
+function redirectToLogin() {
+  window.location.href = "login.html";
 }
 
 /* ===== INIT ===== */
 function init() {
   let user = JSON.parse(localStorage.getItem("user"));
+  const authBtn = document.getElementById("authBtn");
   
   if (!user) { 
-    user = { user_id: 1, username: "Guest User", email: "guest@example.com" };
-    localStorage.setItem("user", JSON.stringify(user));
+    // Gán tài khoản Khách nếu chưa đăng nhập
+    user = { user_id: 0, username: "Guest User", email: "" };
+    if(authBtn) {
+       authBtn.innerText = "Đăng nhập";
+       authBtn.style.background = "#2563eb"; // Đổi nút sang màu xanh 
+    }
+  } else {
+    if(authBtn) {
+       authBtn.innerText = "Đăng xuất";
+       authBtn.style.background = "#dc2626"; // Đổi nút sang màu đỏ
+    }
   }
   
   document.getElementById("userInfo").innerText = "Hi, " + (user.username || user.email);
@@ -306,7 +329,7 @@ async function fetchTagsOnce() {
 /* ===== MỚI: FETCH MEDIA DATA ===== */
 // Hàm này chỉ gọi API nếu cache rỗng, hoặc bị ép làm mới (forceRefresh)
 async function fetchMediaData(forceRefresh = false) {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user")) || { user_id: 0 };
   if (!cachedMediaList || forceRefresh) {
     try {
       const res = await fetch(`${MAPI}/media/${user.user_id}`);
@@ -334,7 +357,7 @@ function navigate(page, el) {
 /* ===== DASHBOARD ===== */
 async function renderDashboard() {
   pageTitle.innerText = "Trang chủ";
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user")) || { user_id: 0, username: "Guest User" };
 
   content.innerHTML = `<div class="media-empty">⏳ Đang tải dữ liệu tổng quan...</div>`;
 
@@ -555,8 +578,9 @@ async function uploadMedia() {
   const file = fileInput.files[0];
   const titleInput = document.getElementById("mediaTitle");
   const title = titleInput.value.trim();
-  const user  = JSON.parse(localStorage.getItem("user"));
+  const user  = JSON.parse(localStorage.getItem("user")) || { user_id: 0 };
 
+  if (!user.user_id) { alert("Vui lòng đăng nhập để upload!"); return; }
   if (!file)  { alert("Vui lòng chọn file"); return; }
   if (!title) { alert("Vui lòng nhập tiêu đề"); return; }
 
@@ -767,7 +791,7 @@ function formatDate(d) { return !d ? "" : new Date(d).toLocaleDateString("vi-VN"
 /* ===== ALBUM ===== */
 async function renderAlbum() {
   pageTitle.innerText = "Album";
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user")) || { user_id: 0 };
 
   let albums = [];
   try {
@@ -1081,7 +1105,8 @@ async function removeFromAlbum(media_id) {
 async function createAlbum() {
   const name = document.getElementById("albumName").value.trim();
   const desc = document.getElementById("albumDesc").value.trim();
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user")) || { user_id: 0 };
+  if (!user.user_id) { alert("Vui lòng đăng nhập để tạo album!"); return; }
   if (!name) { alert("Nhập tên album"); return; }
   const res = await fetch(`${API}/api/albums`, {
     method: "POST", headers: {"Content-Type":"application/json"},
@@ -1099,7 +1124,7 @@ async function deleteAlbum(album_id) {
 /* ===== ACCOUNT ===== */
 async function renderAccount() {
   pageTitle.innerText = "Tài khoản";
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user")) || { user_id: 0, username: "Guest User", email: "" };
 
   let mediaCount = 0;
   let albumCount = 0;
@@ -1129,7 +1154,7 @@ async function renderAccount() {
           ${(user.username || "U").charAt(0).toUpperCase()}
         </div>
         <div class="profile-info">
-          <h3>${user.username || "Tài khoản ảo"}</h3>
+          <h3>${user.username || "Tài khoản Khách"}</h3>
           <p>${user.email}</p>
         </div>
       </div>
@@ -1173,6 +1198,7 @@ async function renderAccount() {
 async function changeEmail() {
   const newEmail = document.getElementById("newEmail").value.trim();
   const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) { alert("Bạn chưa đăng nhập!"); return; }
   if (!newEmail) { alert("Nhập email mới"); return; }
   const res  = await fetch(`${API}/auth/update-email`, {
     method:"PUT", headers:{"Content-Type":"application/json"},
@@ -1186,6 +1212,7 @@ async function changeEmail() {
 async function changePassword() {
   const newPassword = document.getElementById("newPassword").value.trim();
   const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) { alert("Bạn chưa đăng nhập!"); return; }
   if (!newPassword) { alert("Nhập mật khẩu mới"); return; }
   const res  = await fetch(`${API}/auth/update-password`, {
     method:"PUT", headers:{"Content-Type":"application/json"},
@@ -1197,7 +1224,7 @@ async function changePassword() {
 
 function logout() {
   localStorage.clear();
-  redirectToLogin();
+  window.location.href = "login.html";
 }
 
 document.addEventListener("click", e => {
