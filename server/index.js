@@ -67,7 +67,7 @@ app.post("/auth/forgot", async (req,res) => {
     if (!r.recordset.length) return res.status(404).json({ error:"Username và email không khớp" });
     const hash = await bcrypt.hash(newPassword,10);
     await pool.request().input("u",username).input("h",hash)
-      .query("UPDATE users SET password_hash=@h, updated_at=GETDATE() WHERE username=@u");
+      .query("UPDATE users SET password_hash=@h, updated_at=NOW() WHERE username=@u");
     res.json({ message:"Đổi mật khẩu thành công" });
   } catch(err){ res.status(500).json({ error:err.message }); }
 });
@@ -79,7 +79,7 @@ app.put("/auth/update-email", async (req,res) => {
     if ((await pool.request().input("e",newEmail).query("SELECT 1 FROM users WHERE email=@e")).recordset.length)
       return res.status(400).json({ error:"Email đã tồn tại" });
     await pool.request().input("id",user_id).input("e",newEmail)
-      .query("UPDATE users SET email=@e, updated_at=GETDATE() WHERE user_id=@id");
+      .query("UPDATE users SET email=@e, updated_at=NOW() WHERE user_id=@id");
     res.json({ message:"Cập nhật email thành công" });
   } catch(err){ res.status(500).json({ error:err.message }); }
 });
@@ -90,7 +90,7 @@ app.put("/auth/update-password", async (req,res) => {
     const hash = await bcrypt.hash(newPassword,10);
     const pool = await poolPromise;
     await pool.request().input("id",user_id).input("h",hash)
-      .query("UPDATE users SET password_hash=@h, updated_at=GETDATE() WHERE user_id=@id");
+      .query("UPDATE users SET password_hash=@h, updated_at=NOW() WHERE user_id=@id");
     res.json({ message:"Đổi mật khẩu thành công" });
   } catch(err){ res.status(500).json({ error:err.message }); }
 });
@@ -122,7 +122,7 @@ app.get("/api/media/:user_id", async (req,res) => {
     const pool = await poolPromise;
     const r = await pool.request().input("uid", req.params.user_id).query(`
       SELECT m.media_id, m.title, m.file_url, m.media_type, m.uploaded_at, m.visibility,
-             STRING_AGG(t.tag_name,',') AS tags
+             GROUP_CONCAT(t.tag_name) AS tags
       FROM media m
       LEFT JOIN media_tags mt ON mt.media_id=m.media_id
       LEFT JOIN tags t        ON t.tag_id=mt.tag_id
@@ -150,7 +150,7 @@ app.post("/api/media/upload", upload.single("file"), async (req,res) => {
       .input("type", mediaType)
       .query(`INSERT INTO media(user_id,title,file_url,thumbnail_url,file_size_bytes,media_type,uploaded_at,visibility)
               OUTPUT INSERTED.media_id
-              VALUES(@uid,@title,@file_url,@thumb,@size,@type,GETDATE(),1)`);
+              VALUES(@uid,@title,@file_url,@thumb,@size,@type,NOW(),1)`);
     const media_id = ins.recordset[0].media_id;
     const tagIds = JSON.parse(tags||"[]");
     for (const tid of tagIds) {
@@ -184,21 +184,29 @@ app.put("/vis/:media_id", async (req,res) => {
   } catch(err){ res.status(500).json({ error:err.message }); }
 });
 
+app.get("/api/view/:media_id", async (req,res) => {
+  try {
+    const pool = await poolPromise;
+    const r = await pool.request().input("mid",parseInt(req.params.media_id))
+      .query("SELECT title,file_url,media_type,visibility FROM media WHERE media_id=@mid");
+    if (!r.recordset.length||r.recordset[0].visibility!==2)
+      return res.status(403).send("<h2>Media không tồn tại hoặc ở chế độ private</h2>");
+    const m = r.recordset[0];
+    const tag = m.media_type==="image"
+      ? `<img src="http://localhost:3000${m.file_url}">`
+      : `<video src="http://localhost:3000${m.file_url}" controls autoplay></video>`;
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${m.title}</title>
+      <style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh}
+      img,video{max-width:100%;max-height:100%}</style></head><body>${tag}</body></html>`);
+  } catch(err){ res.status(500).send("Lỗi server"); }
+});
+
 /* ── ALBUMS ───────────────────────────────────── */
 app.get("/api/albums/:user_id", async (req,res) => {
   try {
     const pool = await poolPromise;
-    // BỔ SUNG LẤY THÊM ITEM_COUNT VÀ ẢNH BÌA
     const r = await pool.request().input("uid",req.params.user_id)
-      .query(`
-        SELECT a.album_id, a.album_name, a.description, a.created_at,
-               (SELECT COUNT(*) FROM album_media am WHERE am.album_id = a.album_id) AS item_count,
-               (SELECT TOP 1 m.file_url FROM album_media am JOIN media m ON am.media_id = m.media_id WHERE am.album_id = a.album_id ORDER BY am.sort_order ASC, m.uploaded_at DESC) AS cover_url,
-               (SELECT TOP 1 m.media_type FROM album_media am JOIN media m ON am.media_id = m.media_id WHERE am.album_id = a.album_id ORDER BY am.sort_order ASC, m.uploaded_at DESC) AS cover_type
-        FROM albums a
-        WHERE a.user_id=@uid 
-        ORDER BY a.created_at DESC
-      `);
+      .query("SELECT album_id,album_name,description,created_at FROM albums WHERE user_id=@uid ORDER BY created_at DESC");
     res.json(r.recordset);
   } catch(err){ res.status(500).json({ error:err.message }); }
 });
@@ -208,22 +216,8 @@ app.post("/api/albums", async (req,res) => {
   try {
     const pool = await poolPromise;
     await pool.request().input("uid",user_id).input("name",album_name).input("desc",description||"")
-      .query("INSERT INTO albums(user_id,album_name,description,created_at) VALUES(@uid,@name,@desc,GETDATE())");
+      .query("INSERT INTO albums(user_id,album_name,description,created_at) VALUES(@uid,@name,@desc,NOW())");
     res.json({ message:"Tạo album thành công" });
-  } catch(err){ res.status(500).json({ error:err.message }); }
-});
-
-// API MỚI: SỬA THÔNG TIN ALBUM
-app.put("/api/albums/:album_id", async (req,res) => {
-  const { album_name, description } = req.body;
-  try {
-    const pool = await poolPromise;
-    await pool.request()
-      .input("aid", parseInt(req.params.album_id))
-      .input("name", album_name)
-      .input("desc", description || "")
-      .query("UPDATE albums SET album_name=@name, description=@desc WHERE album_id=@aid");
-    res.json({ message:"Đã cập nhật album" });
   } catch(err){ res.status(500).json({ error:err.message }); }
 });
 
@@ -247,7 +241,7 @@ app.get("/api/album-media/:album_id", async (req,res) => {
     const r = await pool.request().input("aid",parseInt(req.params.album_id)).query(`
       SELECT m.media_id, m.title, m.file_url, m.media_type, m.uploaded_at, m.visibility,
              am.sort_order, am.duration_seconds,
-             STRING_AGG(t.tag_name,',') AS tags
+             GROUP_CONCAT(t.tag_name) AS tags
       FROM album_media am
       JOIN media m  ON m.media_id = am.media_id
       LEFT JOIN media_tags mt ON mt.media_id = m.media_id
@@ -271,7 +265,7 @@ app.post("/api/album-media", async (req,res) => {
 
     // sort_order = max hiện tại + 1
     const maxR = await pool.request().input("aid",album_id)
-      .query("SELECT ISNULL(MAX(sort_order),0)+1 AS next_order FROM album_media WHERE album_id=@aid");
+      .query("SELECT IFNULL(MAX(sort_order),0)+1 AS next_order FROM album_media WHERE album_id=@aid");
     const sort_order = maxR.recordset[0].next_order;
 
     await pool.request()
