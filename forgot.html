@@ -38,7 +38,7 @@ async function forgotPassword() {
   }
 
   try {
-    const res  = await fetch("http://localhost:3000/auth/forgot", {
+    const res  = await fetch("https://media-library-backend.onrender.com/auth/forgot", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ username, email, newPassword })
