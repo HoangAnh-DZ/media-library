@@ -92,7 +92,6 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
   transition:.2s;
 }
 
-/* khi mở modal */
 .modal-bg.open{
   opacity:1;
   pointer-events:auto;
@@ -180,7 +179,6 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
 .album-title { font-size: 14px; font-weight: 700; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .album-desc { font-size: 12px; color: #6b7280; margin-top: 4px; height: 32px; overflow: hidden; }
 .album-meta { margin-top: 10px; font-size: 11px; color: #9ca3af; }
-
 </style>
 </head>
 
@@ -207,7 +205,7 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
   </div>
 </div>
 
-<!-- Modal xem trước Media (ảnh/video) -->
+<!-- Modal xem trước Media -->
 <div class="modal-bg" id="mediaModal" onclick="closeModal(event)">
   <div class="modal-box">
     <div class="modal-info" style="border-bottom:1px solid #e5e7eb; padding:12px 16px;">
@@ -215,9 +213,7 @@ body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f3f4f6; 
       <span id="modalTitle" class="modal-title"></span>
     </div>
     <img id="modalImg" class="modal-img" src="" alt="" style="display:none"/>
-    
-<video id="modalVideo" class="modal-img" style="display:none" controls preload="metadata"></video>
-
+    <video id="modalVideo" class="modal-img" style="display:none" controls preload="metadata"></video>
     <div id="modalIcon" class="media-thumb-icon" style="display:none; font-size:80px; height:200px;"></div>
     <div class="modal-info">
       <div id="modalTags" class="modal-tags"></div>
@@ -260,14 +256,30 @@ let allTags      = [];
 let currentMediaList = []; 
 let batchSelections = []; 
 
+/* ===== REDIRECT SAFE ===== */
+/* Ngăn chặn lỗi khi đang ở chế độ xem trước (Preview) bị kẹt chuyển hướng trang */
+function redirectToLogin() {
+  try {
+    window.location.href = "login.html";
+  } catch (err) {
+    document.body.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#f3f4f6; text-align:center; padding:20px;">
+        <h2 style="color:#dc2626; margin-bottom:10px;">Bạn chưa đăng nhập!</h2>
+        <p style="color:#374151; margin-bottom:15px;">Môi trường xem trước không hỗ trợ tự động chuyển trang.</p>
+        <p style="color:#374151;">Vui lòng mở trực tiếp file <b>login.html</b> trên trình duyệt của bạn nhé!</p>
+      </div>
+    `;
+  }
+}
+
 /* ===== INIT ===== */
 function init() {
   let user = JSON.parse(localStorage.getItem("user"));
   
- if (!user) { 
-  window.location.href = "login.html"; 
-  return; 
-}
+  if (!user) { 
+    redirectToLogin(); 
+    return; 
+  }
   
   document.getElementById("userInfo").innerText = "Hi, " + (user.username || user.email);
 
@@ -572,7 +584,23 @@ function renderMediaItems(items) {
           <div class="media-title">${m.title}</div>
           <div class="media-tags">${(m.tags || '').split(',').filter(Boolean).map(t => `<span class="media-tag">#${t}</span>`).join('')}</div>
           <div class="media-meta">${m.media_type} · ${formatDate(m.uploaded_at)}</div>
-          <button type="button" onclick="deleteMedia(${m.media_id})" style="margin-top:8px;width:100%;padding:4px;border:none;border-radius:6px;cursor:pointer;font-size:11px;background:#fee2e2;color:#991b1b">🗑 Xóa media</button>
+          
+          <!-- Bổ sung hiển thị trạng thái hiện tại -->
+          <div style="font-size:11px; margin-top:4px; color:${m.visibility === 2 ? '#10b981' : '#f59e0b'}; font-weight:600;">
+            ${m.visibility === 2 ? '🌍 Đang Công khai' : '🔒 Đang Riêng tư'}
+          </div>
+
+          <!-- Bổ sung nút bấm -->
+          <div style="display:flex; gap:6px; margin-top:8px">
+            <button type="button" onclick="toggleVisibility(${m.media_id}, ${m.visibility})" 
+              style="flex:1; padding:4px; border:none; border-radius:6px; cursor:pointer; font-size:11px; background:#f3f4f6; color:#374151">
+              ${m.visibility === 2 ? '🔒 Khóa lại' : '🌍 Chia sẻ'}
+            </button>
+            <button type="button" onclick="deleteMedia(${m.media_id})" 
+              style="flex:1; padding:4px; border:none; border-radius:6px; cursor:pointer; font-size:11px; background:#fee2e2; color:#991b1b">
+              🗑 Xóa
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -585,6 +613,27 @@ async function deleteMedia(media_id) {
   if (res.ok) loadMediaGrid(); else alert("Xóa thất bại");
 }
 
+async function toggleVisibility(media_id, currentVis) {
+  // Nếu đang là 1 (Private) thì đổi thành 2 (Public) và ngược lại
+  const newVis = currentVis === 1 ? 2 : 1; 
+  
+  try {
+    const res = await fetch(`${API}/vis/${media_id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visibility: newVis })
+    });
+    
+    if (res.ok) {
+      loadMediaGrid(); // Tải lại danh sách để cập nhật giao diện
+    } else {
+      alert("Đổi trạng thái thất bại!");
+    }
+  } catch(e) {
+    alert("Lỗi kết nối đến server");
+  }
+}
+
 /* ── Modal ── */
 function openModal(m) {
   document.getElementById("modalTitle").innerText = m.title;
@@ -592,7 +641,7 @@ function openModal(m) {
   const video = document.getElementById("modalVideo");
   const icon  = document.getElementById("modalIcon");
 
-  img.style.display   = "none"; video.style.display = "none"; video.pause(); video.src = ""; icon.style.display  = "none";
+  img.style.display   = "none"; video.style.display = "none"; video.pause(); video.removeAttribute('src'); icon.style.display  = "none";
 
   if (m.media_type === "image") { img.src = API + m.file_url; img.style.display = "block"; } 
   else if (m.media_type === "video") { video.src = API + m.file_url; video.style.display = "block"; video.load(); video.play().catch(()=>{}); } 
@@ -606,14 +655,14 @@ function openModal(m) {
 function closeModalBtn() {
   document.getElementById("mediaModal").classList.remove("open");
   const video = document.getElementById("modalVideo");
-  if (video) { video.pause(); video.src = ""; }
+  if (video) { video.pause(); video.removeAttribute('src'); }
 }
 
 function closeModal(e) {
   if (e.target === document.getElementById("mediaModal")) {
     document.getElementById("mediaModal").classList.remove("open");
     const video = document.getElementById("modalVideo");
-    if (video) { video.pause(); video.remove(); }
+    if (video) { video.pause(); video.removeAttribute('src'); }
   }
 }
 
@@ -1056,13 +1105,14 @@ async function changePassword() {
   res.ok ? alert("Đổi mật khẩu thành công ✅") : alert(data.error);
 }
 
-function logout() { localStorage.clear(); location.href="login.html"; }
+function logout() {
+  localStorage.clear();
+  redirectToLogin();
+}
 
 document.addEventListener("DOMContentLoaded", init);
 
-
 </script>
-
 
 </body>
 </html>
