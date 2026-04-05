@@ -631,7 +631,30 @@ function generateMediaItemHTML(m) {
         <div class="media-title">${m.title}</div>
         <div class="media-tags">${(m.tags || '').split(',').filter(Boolean).map(t => `<span class="media-tag">#${t}</span>`).join('')}</div>
         <div class="media-meta">${m.media_type} · ${formatDate(m.uploaded_at)}</div>
-        <button type="button" onclick="deleteMedia(${m.media_id})" style="margin-top:8px;width:100%;padding:4px;border:none;border-radius:6px;cursor:pointer;font-size:11px;background:#fee2e2;color:#991b1b">🗑 Xóa media</button>
+        
+        <!-- Bổ sung hiển thị trạng thái hiện tại -->
+        <div style="font-size:11px; margin-top:4px; color:${m.visibility === 2 ? '#10b981' : '#f59e0b'}; font-weight:600;">
+          ${m.visibility === 2 ? '🌍 Đang Công khai' : '🔒 Đang Riêng tư'}
+        </div>
+
+        <!-- Bổ sung nút bấm -->
+        <div style="display:flex; gap:6px; margin-top:8px">
+          <button type="button" onclick="toggleVisibility(${m.media_id}, ${m.visibility})" 
+            style="flex:1; padding:4px; border:none; border-radius:6px; cursor:pointer; font-size:11px; background:#f3f4f6; color:#374151">
+            ${m.visibility === 2 ? '🔒 Khóa lại' : '🌍 Chia sẻ'}
+          </button>
+          <button type="button" onclick="deleteMedia(${m.media_id})" 
+            style="flex:1; padding:4px; border:none; border-radius:6px; cursor:pointer; font-size:11px; background:#fee2e2; color:#991b1b">
+            🗑 Xóa
+          </button>
+        </div>
+        
+        ${m.visibility === 2 ? `
+          <div style="margin-top:4px">
+            <input readonly value="${MAPI}/view/${m.media_id}"
+              style="width:100%;font-size:10px;padding:3px 6px;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer"
+              onclick="this.select(); document.execCommand('copy'); alert('Đã copy link!')">
+          </div>` : ''}
       </div>
     </div>
   `;
@@ -684,6 +707,23 @@ async function deleteMedia(media_id) {
   }
 }
 
+async function toggleVisibility(media_id, currentVis) {
+  const newVis = currentVis === 1 ? 2 : 1; 
+  try {
+    const res = await fetch(`${API}/vis/${media_id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visibility: newVis })
+    });
+    if (res.ok) {
+      // Cập nhật lại Cache và giao diện một cách nhẹ nhàng
+      const newItems = await fetchMediaData(true);
+      renderMediaItems(newItems);
+    } else {
+      alert("Đổi trạng thái thất bại!");
+    }
+  } catch(e) { alert("Lỗi kết nối đến server"); }
+}
 
 /* ── Modal ── */
 function openModal(m) {
