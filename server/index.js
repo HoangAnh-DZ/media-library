@@ -6,26 +6,43 @@ const path    = require("path");
 const fs      = require("fs");
 const { poolPromise } = require("./db");
 
+// 1. KHAI BÁO THƯ VIỆN CLOUDINARY VỪA CÀI
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+
+// 2. ĐIỀN THÔNG TIN TÀI KHOẢN CLOUDINARY CỦA ANH VÀO ĐÂY NHÉ 👇
+cloudinary.config({
+  cloud_name: 'Root', 
+  api_key: '937119381657455',       
+  api_secret: 'gtWDfKlBr8uvOqApM4m2KiOsckU'  
+});
+
 const app = express();
 app.use(cors({ origin: "*", methods: ["GET","POST","PUT","DELETE"] }));
 app.use(express.json());
 
-/* ── FILE UPLOAD ──────────────────────────────── */
-const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename:    (req, file, cb) => cb(null, Date.now() + "-" + Math.round(Math.random()*1e9) + path.extname(file.originalname))
+/* ── FILE UPLOAD (ĐÃ CHUYỂN SANG CLOUDINARY) ──────────────────────────────── */
+// 3. CẤU HÌNH LƯU TRỮ LÊN MẠNG THAY VÌ Ổ CỨNG MÁY TÍNH
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'media_library', // Tên thư mục tự động tạo trên Cloudinary
+    resource_type: 'auto',   // Tự nhận diện ảnh hoặc video
+  },
 });
+
 const upload = multer({
-  storage,
-  limits: { fileSize: 500 * 1024 * 1024 },
+  storage: storage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // Giới hạn 100MB cho bản miễn phí
   fileFilter: (req, file, cb) => {
     if (["image/","video/"].some(t => file.mimetype.startsWith(t))) cb(null, true);
     else cb(new Error("Chỉ chấp nhận ảnh và video"));
   }
 });
+
+// Vẫn giữ lại mục này để ảnh cũ của anh không bị lỗi nếu anh dùng Local
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 app.use("/uploads", express.static(uploadDir));
 
 /* ── AUTH ─────────────────────────────────────── */
@@ -174,7 +191,8 @@ app.post("/api/media/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Chưa chọn file" });
 
-    const fileUrl   = `/uploads/${req.file.filename}`;
+    // 4. LẤY LINK MẠNG TRỰC TIẾP TỪ CLOUDINARY
+    const fileUrl   = req.file.path; 
     const mediaType = req.file.mimetype.startsWith("image") ? "image"
                     : req.file.mimetype.startsWith("video") ? "video" : "file";
     const pool = await poolPromise;
@@ -212,9 +230,7 @@ app.delete("/api/media/:media_id", async (req, res) => {
 
     if (!r.recordset.length) return res.status(404).json({ error: "Không tìm thấy" });
 
-    const fp = path.join(uploadDir, path.basename(r.recordset[0].file_url));
-    if (fs.existsSync(fp)) fs.unlinkSync(fp);
-
+    // Đã bỏ dòng xóa file local ổ cứng vì ảnh giờ nằm trên mạng
     await pool.request().input("mid", parseInt(req.params.media_id))
       .query("DELETE FROM media WHERE media_id=@mid");
 
@@ -244,9 +260,13 @@ app.get("/api/view/:media_id", async (req, res) => {
 
     const m   = r.recordset[0];
     const BASE = process.env.BASE_URL || "https://media-library-backend.onrender.com";
+    
+    // Xử lý link thông minh cho cả ảnh mới và cũ
+    const finalUrl = m.file_url.startsWith('http') ? m.file_url : BASE + m.file_url;
+
     const tag  = m.media_type === "image"
-      ? `<img src="${BASE}${m.file_url}">`
-      : `<video src="${BASE}${m.file_url}" controls autoplay></video>`;
+      ? `<img src="${finalUrl}">`
+      : `<video src="${finalUrl}" controls autoplay></video>`;
 
     res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${m.title}</title>
       <style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh}
@@ -284,7 +304,6 @@ app.post("/api/albums", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// API MỚI BỔ SUNG: SỬA TÊN VÀ MÔ TẢ ALBUM
 app.put("/api/albums/:album_id", async (req, res) => {
   const { album_name, description } = req.body;
   try {
