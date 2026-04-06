@@ -12,7 +12,7 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 // 2. ĐIỀN THÔNG TIN TÀI KHOẢN CLOUDINARY CỦA ANH VÀO ĐÂY NHÉ 👇
 cloudinary.config({
-  cloud_name: 'Root', 
+  cloud_name: 'dvyrzm63n', 
   api_key: '937119381657455',       
   api_secret: 'gtWDfKlBr8uvOqApM4m2KiOsckU'  
 });
