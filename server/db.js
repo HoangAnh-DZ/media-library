@@ -1,4 +1,4 @@
-const mysql = require("mysql2/promisee");
+const mysql = require("mysql2/promise");
 
 // Dùng biến môi trường khi deploy lên Render, fallback về local
 const pool = mysql.createPool({
